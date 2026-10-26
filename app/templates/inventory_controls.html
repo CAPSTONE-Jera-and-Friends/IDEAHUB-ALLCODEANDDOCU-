@@ -1,0 +1,130 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inventory-workflow.css', v=config['INVENTORY_JS_VERSION']) }}">
+<div id="inventory-workflow" data-admin="{{ 'true' if session.get('role') in ('admin', 'staff') else 'false' }}" data-kitchen="{{ 'true' if session.get('role') in ('admin', 'staff') else 'false' }}"></div>
+<dialog id="stock-dialog" aria-labelledby="stock-dialog-title">
+  <form id="stock-form">
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+      <h2 id="stock-dialog-title" class="h5 m-0">Update stock</h2>
+      <button type="button" class="btn-close" aria-label="Close" onclick="document.getElementById('stock-dialog').close()"></button>
+    </div>
+    <p id="stock-item-name" class="fw-semibold mb-1"></p>
+    <p id="stock-help" class="text-muted small"></p>
+    <div id="stock-mode-field" class="mb-3">
+      <label for="stock-mode" class="form-label">How should we count this item?</label>
+      <select id="stock-mode" class="form-select">
+        <option value="prepared">Count servings — kitchen prepares a batch</option>
+        <option value="direct">Count pieces — bottles, cans and packaged items</option>
+        <option value="untracked">Don't track quantity — manually available</option>
+        <option value="recipe">Manual servings with an ingredient list</option>
+      </select>
+    </div>
+    <div id="stock-quantity-field" class="mb-3">
+      <label id="stock-quantity-label" for="stock-quantity" class="form-label">How many?</label>
+      <input id="stock-quantity" class="form-control" type="number" inputmode="numeric" min="0" max="999999" step="1">
+    </div>
+    <div id="stock-threshold-field" class="mb-3">
+      <label for="stock-threshold" class="form-label">Remind me to restock when this much is left</label>
+      <input id="stock-threshold" class="form-control" type="number" min="0" max="999999" step="1" value="3">
+    </div>
+    <div class="mb-3">
+      <label for="stock-reason" class="form-label">Reason / note</label>
+      <input id="stock-reason" class="form-control" maxlength="160" placeholder="e.g. Morning batch or closing stock count">
+    </div>
+    <p id="stock-error" class="text-danger small" role="alert"></p>
+    <div class="d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-light" onclick="document.getElementById('stock-dialog').close()">Cancel</button>
+      <button type="submit" id="stock-save" class="btn btn-warning fw-semibold">Save stock change</button>
+    </div>
+  </form>
+</dialog>
+{% if session.get('role') in ('admin', 'staff') %}
+<dialog id="servings-dialog" aria-labelledby="servings-dialog-title">
+  <form id="servings-form">
+    <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+      <h2 id="servings-dialog-title" class="h5 m-0">Add prepared servings</h2>
+      <button type="button" class="btn-close" aria-label="Close" onclick="document.getElementById('servings-dialog').close()"></button>
+    </div>
+    <p class="text-muted small">Enter the new servings in this batch. This adds to the available count and records your name and time. Orders reduce the count; raw ingredients are updated separately.</p>
+    <p class="fw-semibold" id="servings-meal-name"></p>
+    <input type="hidden" id="servings-meal">
+    <div class="mb-3">
+      <label for="servings-count" class="form-label">New servings in this batch</label>
+      <input id="servings-count" class="form-control" type="number" inputmode="numeric" min="1" max="999999" step="1" required>
+      <div id="servings-current" class="form-text"></div>
+    </div>
+    <div class="mb-3"><label for="servings-note" class="form-label">Batch note (optional)</label>
+      <input id="servings-note" class="form-control" maxlength="160" placeholder="e.g. Morning preparation"></div>
+    <p id="servings-error" class="text-danger small" role="alert"></p>
+    <div class="d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-light" onclick="document.getElementById('servings-dialog').close()">Cancel</button>
+      <button type="submit" id="servings-save" class="btn btn-warning fw-semibold">Add batch</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% if session.get('role') in ('admin', 'staff') %}
+<dialog id="meal-daily-audit-dialog" aria-labelledby="meal-daily-audit-title">
+  <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      <h2 id="meal-daily-audit-title" class="h5 m-0">Daily servings: <span id="meal-daily-audit-name"></span></h2>
+      <p class="text-muted small mt-1 mb-0">Placed orders include customers who have not paid. This shows recorded activity; compare it with physical stock to spot missing servings.</p>
+    </div>
+    <button type="button" class="btn-close" aria-label="Close daily servings" onclick="document.getElementById('meal-daily-audit-dialog').close()"></button>
+  </div>
+  <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+    <div><label for="meal-daily-audit-date" class="form-label mb-1">Business date (Asia/Manila)</label>
+      <input id="meal-daily-audit-date" type="date" class="form-control"></div>
+    <button type="button" id="meal-daily-audit-prev" class="btn btn-outline-secondary btn-sm" aria-label="Previous date">Previous</button>
+    <button type="button" id="meal-daily-audit-next" class="btn btn-outline-secondary btn-sm" aria-label="Next date">Next</button>
+    <button type="button" id="meal-daily-audit-today" class="btn btn-outline-secondary btn-sm">Today</button>
+  </div>
+  <p id="meal-daily-audit-status" class="small" role="status" aria-live="polite"></p>
+  <div id="meal-daily-audit-summary" class="meal-daily-summary mb-3"></div>
+  <section aria-labelledby="meal-daily-batches-title" class="mb-3">
+    <h3 id="meal-daily-batches-title" class="h6">Servings added</h3>
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Serving batches"><table class="table table-sm align-middle">
+      <thead><tr><th>When</th><th>Quantity</th><th>By</th><th>Reason</th></tr></thead>
+      <tbody id="meal-daily-batches"></tbody>
+    </table></div>
+  </section>
+  <section aria-labelledby="meal-daily-orders-title" class="mb-3">
+    <h3 id="meal-daily-orders-title" class="h6">Customer orders</h3>
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Customer orders"><table class="table table-sm align-middle">
+      <thead><tr><th>When</th><th>Customer / location</th><th>Order</th><th>Placed</th><th>Cancelled</th><th>Net</th><th>Entered by</th><th>Checkout</th></tr></thead>
+      <tbody id="meal-daily-orders"></tbody>
+    </table></div>
+    <button type="button" id="meal-daily-more" class="btn btn-outline-secondary btn-sm" hidden>Load more orders</button>
+  </section>
+  <section aria-labelledby="meal-daily-movements-title" class="mb-3">
+    <h3 id="meal-daily-movements-title" class="h6">Other stock movements and returns</h3>
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Other stock movements"><table class="table table-sm align-middle">
+      <thead><tr><th>When</th><th>Change</th><th>By</th><th>Reason</th></tr></thead>
+      <tbody id="meal-daily-movements"></tbody>
+    </table></div>
+  </section>
+  <button type="button" id="meal-daily-history" class="btn btn-outline-secondary btn-sm">View full meal history</button>
+</dialog>
+<dialog id="meal-history-dialog" aria-labelledby="meal-history-title">
+  <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+    <h2 id="meal-history-title" class="h5 m-0">Meal history: <span id="meal-history-name"></span></h2>
+    <button type="button" class="btn-close" aria-label="Close" onclick="document.getElementById('meal-history-dialog').close()"></button>
+  </div>
+  <div class="table-responsive" style="max-height: 60vh; overflow: auto;">
+    <table class="table table-sm align-middle">
+      <thead><tr><th>When</th><th>Action</th><th>Change</th><th>Details</th><th>By</th></tr></thead>
+      <tbody id="meal-history-rows"></tbody>
+    </table>
+  </div>
+  <button type="button" id="meal-history-more" class="btn btn-outline-secondary btn-sm" hidden>Load older history</button>
+</dialog>
+<details class="prepared-summary mt-4 p-3 bg-white rounded-3 border">
+  <summary class="fw-semibold">Prepared servings summary</summary>
+  <p class="text-muted small mt-2">Recorded totals since tracking began. Stock corrections can change the remaining count.</p>
+  <div id="prepared-summary-list" class="table-responsive mt-3"></div>
+</details>
+<details class="stock-history mt-4 p-3 bg-white rounded-3 border">
+  <summary class="fw-semibold">Stock activity — recent changes</summary>
+  <p class="text-muted small mt-2">Latest 100 changes, including batches, waste, corrections and cancellations. Sale deductions are also available in each item's History.</p>
+  <div id="stock-history-list" class="table-responsive mt-3"></div>
+</details>
+{% endif %}
+<script defer src="{{ url_for('static', filename='js/inventory-workflow.js', v=config['INVENTORY_JS_VERSION']) }}"></script>

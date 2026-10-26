@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block title %}Staff Receivables - IdeaFlow{% endblock %}
+{% block content %}
+  {% set receivables_base = '/receivables-view' %}
+  {% include "partials/receivables_workspace.html" %}
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/receivable-collections.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/receivables-dated.js') }}?v=1"></script>
+<script>
+  const receivablesPage = window.ReceivablesDatedPage('/receivables-view');
+  const refreshReceivables = window.createDebouncedRefresh(() => receivablesPage.reload(), 150);
+  const socket = window.getIdeaFlowSocket();
+  if (socket) socket.on('receivables_update', refreshReceivables);
+  receivablesPage.afterMutation = async function () {
+    refreshReceivables.cancel();
+    await receivablesPage.reload();
+    window.refreshReceivableCollections?.();
+  };
+</script>
+{% endblock %}

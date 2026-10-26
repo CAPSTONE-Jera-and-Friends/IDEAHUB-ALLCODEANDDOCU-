@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IdeaFlow Daily Sales Balance</title>
+  <style>
+    @page { size: A4 portrait; margin: 16mm; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #23354d; line-height: 1.4; }
+    h1 { font-size: 22pt; margin: 0; }
+    h2 { font-size: 15pt; border-bottom: 2px solid #c9a43a; padding-bottom: 5px; margin-top: 18px; break-after: avoid; }
+    h3 { font-size: 11pt; margin: 14px 0 5px; break-after: avoid; }
+    h2, h3 { page-break-after: avoid; -pdf-keep-with-next: true; }
+    p { margin: 5px 0 10px; }
+    .muted { color: #64748b; font-size: 9pt; }
+    .new-page { break-before: page; page-break-before: always; }
+    .review { color: #9a3412; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 12px; }
+    col.label { width: 62%; } col.value { width: 38%; }
+    td { padding: 4px 7px; border-bottom: 1px solid #e5e7eb; vertical-align: top; overflow-wrap: anywhere; word-wrap: break-word; }
+    td.item { width: 62%; }
+    td.amount, td.text-value { width: 38%; white-space: pre-wrap; }
+    td.amount { text-align: right; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+    tr:nth-child(odd) { background: #f8fafc; }
+    .header { padding-bottom: 8px; }
+  </style>
+</head>
+<body>
+{% macro values(items, counts=false) %}
+<table><colgroup><col class="label"><col class="value"></colgroup><tbody>
+  {% for label, value in items %}{% for part in text_parts(value) %}<tr><td class="item" width="62%">{{ label }}{% if not loop.first %} (continued){% endif %}</td><td class="{{ 'amount' if part is number else 'text-value' }}" width="38%">{% if part is none %}<span class="muted">Not available</span>{% elif part is number %}{% if counts %}{{ part|int }}{% else %}Php {{ "%.2f"|format(part) }}{% endif %}{% else %}{% for line in pdf_text_lines(part) %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}{% endif %}</td></tr>{% endfor %}{% endfor %}
+</tbody></table>
+{% endmacro %}
+  <div class="header"><h1>IdeaFlow</h1><p>Daily Sales Balance</p><p class="muted">Asia/Manila business dates: {{ period_label }}<br>Exported {{ generated_at }}</p></div>
+  <h2>Period Summary</h2>
+  {{ values([('Checkout Sales', total_revenue), ('Debt Collected', total_collections), ('Business Expenses', total_business_expenses), ('External-funded Expenses', total_external_expenses), ('Business Debt Paid', total_business_payables_paid), ('External-funded Debt Paid', total_external_payables_paid), ('Owner Cash Added', total_owner_topups), ('Cash Taken Out', total_cash_withdrawals), ('Net Movement (all methods)', net_balance)]) }}
+  <h2>Checkout Sales Breakdown</h2>
+  {{ values([('Cowork Bill',cowork_bill), ('Cafe Bill',cafe_bill), ('Discounts',discounts_total), ('Checkout Sales',total_revenue), ('Refunds Paid',total_refunds)]) }}
+  <p class="muted">Cowork + Cafe - Discounts = Checkout sales. Refunds are shown on their payment date. Debt collections and owner funding are separate cash flows.</p>
+  {% if sales_reconciliation_difference %}<p class="review">Review older checkout records: the component breakdown differs by Php {{ '%.2f'|format(sales_reconciliation_difference) }}.</p>{% endif %}
+  <h2>Payment Method Reconciliation</h2>
+  <p class="muted">Money received - money paid out = net movement. External-funded costs are reference amounts. Owner reimbursement is already included in debt paid. Only methods with activity are listed.</p>
+  {% for m in method_rows if m.active %}
+    <h3>{{ 'Older records (method unknown)' if m.method == 'unclassified' else m.method|upper }}</h3>
+    {{ values([('Net Movement',m.net), ('Money Received',m.received), ('Money Paid Out',m.paid_out)]) }}
+    <table><tbody>{% for flow,label in flow_labels.items() %}<tr><td class="item" width="62%">{{ label }}</td><td class="amount" width="38%">Php {{ '%.2f'|format(m[flow]) }}</td></tr>{% endfor %}</tbody></table>
+  {% else %}<p class="muted">No payment activity for these dates.</p>{% endfor %}
+  {% for report, sections in report_details %}
+  <div class="new-page"><h2>Daily Report: {{ report.report_date }}</h2><p class="muted">Live totals{% if report.get('id') is not none %}; saved cash snapshot available{% else %}; no saved report{% endif %}. Saved cash values retain their recorded amounts.</p>
+    {% if report.get('petty_cash_snapshot_difference') or report.get('customer_cash_snapshot_difference') %}<p class="review">Review: cash differs from the saved snapshot.</p>{% endif %}
+    {% for title, items in sections.items() %}<h3>{{ title }}</h3>{{ values(items, title in ['Activity','Checkout counts']) }}{% endfor %}
+  </div>
+  {% else %}<p class="muted">No daily reports in this range.</p>{% endfor %}
+  <div class="new-page"><h2>Soft Balancing History (AM/PM)</h2><p class="muted">These are saved snapshots. They overlap with Daily Reports and must not be added to them.</p>
+  {% for entry, sections in soft_details %}
+    <h2>{{ entry.balance_date }} / {{ entry.period }} / #{{ entry.id }}</h2>
+    {% if entry.get('petty_cash_live_difference') or entry.get('customer_cash_live_difference') %}<p class="review">Review: cash changed after this snapshot.</p>{% endif %}
+    {% for title, items in sections.items() %}<h3>{{ title }}</h3>{{ values(items) }}{% endfor %}
+  {% else %}<p class="muted">No saved soft balances in this range.</p>{% endfor %}
+  </div>
+</body>
+</html>

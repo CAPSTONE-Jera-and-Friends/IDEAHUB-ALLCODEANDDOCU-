@@ -1,0 +1,582 @@
+{% extends "layout.html" %}
+
+{% block title %}Payables - IdeaFlow{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+  <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h3 class="mb-0">Payables / Supplier Debt Tracker</h3>
+      <small id="payables-count" class="text-muted">0 records</small>
+    </div>
+    <button class="btn btn-warning text-dark" data-bs-toggle="modal" data-bs-target="#addPayableModal">
+      + New Payable
+    </button>
+  </div>
+
+  <div class="row mb-4 g-2">
+    <div class="col-12 col-sm-6 col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body py-3">
+          <small>Total Unpaid Payables</small>
+          <div class="h5 mb-0">₱<span id="total-unpaid-payables">0.00</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-md-3">
+      <div class="card bg-warning text-dark">
+        <div class="card-body py-3">
+          <small>Unpaid Count</small>
+          <div class="h5 mb-0" id="unpaid-payables-count">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    <label for="paidStartDate" class="small fw-semibold">Supplier payment dates</label>
+    <input type="date" id="paidStartDate" class="form-control form-control-sm w-auto" aria-label="Start supplier payment date" onchange="loadPayableCards()">
+    <span>to</span>
+    <input type="date" id="paidEndDate" class="form-control form-control-sm w-auto" aria-label="End supplier payment date" onchange="loadPayableCards()">
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setPaidDates('today')">Today</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setPaidDates('all')">Show All</button>
+  </div>
+  <p class="small text-muted mb-2">Payments by method for the selected Manila dates. External-funded payments reduce supplier debt but leave business funds unchanged.</p>
+  <div class="row g-2 mb-4" id="payable-method-cards" aria-live="polite"></div>
+
+  <!-- Filter section -->
+  <div class="d-flex gap-2 mb-3 flex-wrap">
+    <button class="btn btn-outline-secondary btn-sm active filter-btn" onclick="setPayablesFilter('All', this)">All</button>
+    <button class="btn btn-outline-secondary btn-sm filter-btn" onclick="setPayablesFilter('Unpaid', this)">Unpaid</button>
+    <button class="btn btn-outline-secondary btn-sm filter-btn" onclick="setPayablesFilter('Partially Paid', this)">Partially Paid</button>
+    <button class="btn btn-outline-secondary btn-sm filter-btn" onclick="setPayablesFilter('Paid', this)">Paid</button>
+  </div>
+
+  <!-- Desktop Table View -->
+  <div class="card d-none d-md-block">
+    <div class="card-header">
+      <h5 class="mb-0">All Payables</h5>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Supplier</th>
+              <th>Items/Service Description</th>
+              <th>Amount Owed</th>
+              <th>Partial Paid</th>
+              <th>Incurred Date</th>
+              <th>Due Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="payables-table-body">
+            <tr><td colspan="8" class="text-center text-muted py-3">Loading payables...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Card View -->
+  <div class="d-md-none" id="payables-card-container">
+    <p class="text-center text-muted py-4">Loading...</p>
+  </div>
+</div>
+
+<!-- Add Payable Modal -->
+<div class="modal fade" id="addPayableModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Payable Record</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Creditor / Supplier Name *</label>
+          <input type="text" id="creditorName" class="form-control" placeholder="e.g. Calamansi Juice Supplier" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Items / Service Description *</label>
+          <textarea id="payableDesc" class="form-control" rows="3" placeholder="e.g. 5 boxes of fresh calamansi" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Amount Owed (₱) *</label>
+          <input type="number" id="payableAmount" class="form-control" step="0.01" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Date Incurred *</label>
+          <input type="date" id="incurredDate" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Due Date *</label>
+          <input type="date" id="payableDueDate" class="form-control" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-warning text-dark" onclick="createPayable()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mark Paid Confirmation Modal -->
+<div class="modal fade" id="markPayablePaidModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+      <div class="modal-body text-center p-4 p-md-5">
+        <div class="mb-3 d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+          <i class="bi bi-check-circle-fill text-success" style="font-size: 32px;"></i>
+        </div>
+        <h5 class="mb-2 fw-bold">Record Supplier Payment</h5>
+        <p class="text-muted mb-4 small">Log a full or partial payment to this supplier.</p>
+        
+        <div class="text-start mb-3 p-3 bg-light border rounded-3">
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-muted">Supplier</span>
+            <strong id="markPayableSupplier">—</strong>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-muted">Remaining Balance</span>
+            <strong id="markPayableAmount" class="text-danger">—</strong>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-muted">Due date</span>
+            <strong id="markPayableDueDate">—</strong>
+          </div>
+        </div>
+
+        <div class="mb-3 text-start">
+          <label class="form-label fw-semibold">Payment Type</label>
+          <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" name="paymentType" id="paymentTypeFull" value="full" checked autocomplete="off" onchange="togglePaymentTypeFields()">
+            <label class="btn btn-outline-success" for="paymentTypeFull">Full Payment</label>
+
+            <input type="radio" class="btn-check" name="paymentType" id="paymentTypePartial" value="partial" autocomplete="off" onchange="togglePaymentTypeFields()">
+            <label class="btn btn-outline-warning text-dark" for="paymentTypePartial">Partial Payment</label>
+          </div>
+        </div>
+
+        <div class="mb-4 text-start" id="partialAmountContainer" style="display: none;">
+          <label class="form-label fw-semibold">Payment Amount (₱) *</label>
+          <input type="number" id="payAmountInput" class="form-control" placeholder="Enter amount to pay" step="0.01" oninput="calculateRemainingBalance()">
+          <div class="form-text text-muted mt-2">
+            Remaining Balance after payment: <strong id="remainingBalanceText">₱0.00</strong>
+          </div>
+        </div>
+
+        <div class="mb-4 text-start">
+          <label class="form-label fw-semibold" for="payablePaymentMethod">Paid using *</label>
+          <select id="payablePaymentMethod" class="form-select" required>
+            <option value="">Select method...</option>
+            <option value="cash">Cash</option><option value="gcash">GCash</option>
+            <option value="bdo">BDO</option><option value="bpi">BPI</option>
+            <option value="queenbank">QueenBank</option>
+          </select>
+        </div>
+        <div class="mb-4 text-start d-none" id="payableCashBoxGroup"><label class="form-label" for="payableCashBox">Cash paid from *</label><select id="payableCashBox" class="form-select"><option value="">Choose box...</option><option value="petty">Petty cash box</option><option value="customer">Customer cash box</option></select></div>
+
+        <div class="d-flex gap-2 justify-content-center">
+          <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success px-4" id="confirmPayableMarkPaidBtn">
+            <i class="bi bi-check2 me-1"></i> Confirm Paid
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="payableHistoryModal" tabindex="-1" aria-labelledby="payableHistoryTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="payableHistoryTitle">Payment history</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body" id="payableHistoryBody"></div>
+  </div></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('payablePaymentMethod').addEventListener('change', () => {
+  document.getElementById('payableCashBoxGroup').classList.toggle('d-none', document.getElementById('payablePaymentMethod').value !== 'cash');
+});
+let payablesCache = [];
+let payablesLoadError = null;
+let pendingPayableId = null;
+let markPayableModalInstance = null;
+let activePayableFilter = "All";
+let payableCardRequestId = 0;
+
+function manilaPayableDate() {
+  return new Intl.DateTimeFormat('sv-SE', {timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date());
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Set default incurred date to today
+  document.getElementById('incurredDate').valueAsDate = new Date();
+  
+  const today = manilaPayableDate();
+  document.getElementById('paidStartDate').value = today;
+  document.getElementById('paidEndDate').value = today;
+  loadPayables();
+  const socket = window.getIdeaFlowSocket();
+  if (socket) {
+    const refresh = window.createDebouncedRefresh(loadPayables, 150);
+    socket.on('daily_balance_update', refresh);
+    socket.on('connect', refresh);
+  }
+  
+  const markModalEl = document.getElementById('markPayablePaidModal');
+  if (markModalEl) {
+    markPayableModalInstance = new bootstrap.Modal(markModalEl);
+    document.getElementById('confirmPayableMarkPaidBtn').addEventListener('click', confirmMarkPayablePaid);
+  }
+});
+
+function setPayablesFilter(status, btn) {
+  activePayableFilter = status;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPayables();
+}
+
+function loadPayables() {
+  loadPayableCards();
+  fetchJSON(`${window.managementBase}/payables/api/payables`)
+    .then(data => {
+      if (!data.success) throw new Error('Payables unavailable');
+      payablesLoadError = null;
+      payablesCache = data.data;
+      renderPayables();
+    })
+    .catch(error => {
+      const message = error.status === 403 ? 'Payables access denied.' : 'Payables could not be loaded. Please refresh the page.';
+      payablesLoadError = message;
+      payablesCache = [];
+      renderPayables();
+      showToast(message, 'error');
+    });
+}
+
+function setPaidDates(preset) {
+  const day = preset === 'today' ? manilaPayableDate() : '';
+  document.getElementById('paidStartDate').value = day;
+  document.getElementById('paidEndDate').value = day;
+  loadPayableCards();
+}
+
+function loadPayableCards() {
+  const requestId = ++payableCardRequestId;
+  const params = new URLSearchParams();
+  const start = document.getElementById('paidStartDate').value;
+  const end = document.getElementById('paidEndDate').value;
+  if (start) params.set('start_date', start);
+  if (end) params.set('end_date', end);
+  fetchJSON(`${window.managementBase}/daily-balance/api/reports?${params}`).then(result => {
+    if (requestId !== payableCardRequestId) return;
+    if (!result.success) throw new Error('Could not load payment totals');
+    const methods = [['cash', 'Cash'], ['gcash', 'GCash'], ['bdo', 'BDO'],
+      ['bpi', 'BPI'], ['queenbank', 'QueenBank'], ['unclassified', 'Legacy / unknown']];
+    const rows = methods.map(([key, label]) => ({key, label, ...result.data.reduce((sum, report) => ({
+      business: sum.business + Number((report.payable_methods || {})[key] || 0),
+      external: sum.external + Number((report.external_payable_methods || {})[key] || 0),
+      paid: sum.paid + Number((report.payable_paid_methods || {})[key] || 0)
+    }), {business: 0, external: 0, paid: 0})}));
+    const overall = rows.reduce((sum, row) => ({
+      business: sum.business + row.business, external: sum.external + row.external,
+      paid: sum.paid + row.paid
+    }), {business: 0, external: 0, paid: 0});
+    const card = (label, amounts) => `<div class="col-12 col-sm-6 col-xl-3"><div class="card h-100 shadow-sm"><div class="card-body">
+      <div class="small text-muted fw-semibold">${label}</div><div class="h5 mb-2">₱${amounts.paid.toFixed(2)}</div>
+      <div class="small">Business ₱${amounts.business.toFixed(2)} · External-funded ₱${amounts.external.toFixed(2)}</div>
+    </div></div></div>`;
+    document.getElementById('payable-method-cards').innerHTML = card('All methods · supplier paid', overall) +
+      rows.filter(row => row.key !== 'unclassified' || row.paid).map(row => card(row.label, row)).join('');
+  }).catch(() => {
+    if (requestId !== payableCardRequestId) return;
+    document.getElementById('payable-method-cards').textContent = 'Supplier payment totals unavailable.';
+    showToast('Could not load supplier payment totals.', 'error');
+  });
+}
+
+function renderPayables() {
+  const tbody = document.getElementById('payables-table-body');
+  const cardContainer = document.getElementById('payables-card-container');
+  tbody.innerHTML = '';
+  cardContainer.innerHTML = '';
+  if (payablesLoadError) {
+    document.getElementById('payables-count').textContent = 'Records unavailable';
+    document.getElementById('total-unpaid-payables').textContent = '—';
+    document.getElementById('unpaid-payables-count').textContent = '—';
+    tbody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">${payablesLoadError}</td></tr>`;
+    cardContainer.textContent = payablesLoadError;
+    return;
+  }
+
+  let totalUnpaid = 0;
+  let unpaidCount = 0;
+  
+  let filtered = payablesCache;
+  if (activePayableFilter !== 'All') {
+    filtered = filtered.filter(p => p.status === activePayableFilter);
+  }
+
+  // Calculate unpaid sums on ALL payables (not just filtered)
+  payablesCache.forEach(p => {
+    if (p.status !== 'Paid' && !p.cancelled_at) {
+      totalUnpaid += p.amount_owed - p.partial_paid;
+      unpaidCount++;
+    }
+  });
+
+  document.getElementById('total-unpaid-payables').textContent = totalUnpaid.toFixed(2);
+  document.getElementById('unpaid-payables-count').textContent = unpaidCount;
+  document.getElementById('payables-count').textContent = `${filtered.length} record(s)`;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No payables found.</td></tr>';
+    cardContainer.innerHTML = '<p class="text-center text-muted py-4">No payables found.</p>';
+    return;
+  }
+
+  let cardHtml = '<div class="d-flex flex-column gap-2">';
+
+  filtered.forEach(p => {
+    const statusBadge = p.cancelled_at ? '<span class="badge bg-secondary">Cancelled</span>' : p.status === 'Paid'
+      ? '<span class="badge bg-success">Paid</span>' 
+      : p.status === 'Partially Paid' 
+        ? '<span class="badge bg-warning text-dark">Partially Paid</span>' 
+        : '<span class="badge bg-danger">Unpaid</span>';
+
+    const actionButton = p.status !== 'Paid' && !p.cancelled_at
+      ? `<button class="btn btn-sm btn-success" onclick="openMarkPayablePaidModal(${p.id})">Mark Paid</button>` 
+      : '';
+    const historyButton = `<button class="btn btn-sm btn-outline-secondary ms-1" onclick="showPayableHistory(${p.id})">History</button>`;
+
+    // Desktop
+    tbody.innerHTML += `
+      <tr>
+        <td class="fw-semibold">${window.escapeHTML(p.creditor_name)}${p.kind === 'owner_reimbursement' ? '<div class="small text-primary">Owner reimbursement</div>' : ''}</td>
+        <td>${window.escapeHTML(p.items)}</td>
+        <td>₱${p.amount_owed.toFixed(2)}</td>
+        <td>₱${p.partial_paid.toFixed(2)}</td>
+        <td>${p.incurred_date}</td>
+        <td>${p.due_date}</td>
+        <td>${statusBadge}</td>
+        <td>${actionButton}${historyButton}</td>
+      </tr>
+    `;
+
+    // Mobile Card
+    cardHtml += `
+      <div class="record-card">
+        <div class="record-card-header">
+          <div>
+            <div class="record-card-title">${window.escapeHTML(p.creditor_name)}</div>
+            <div class="record-card-subtitle">Due: ${p.due_date}</div>
+          </div>
+          ${statusBadge}
+        </div>
+        <div class="record-card-body">
+          <div class="record-card-row">
+            <span class="record-card-label">Description:</span>
+            <span class="record-card-value">${window.escapeHTML(p.items)}</span>
+          </div>
+          <div class="record-card-row">
+            <span class="record-card-label">Amount Owed:</span>
+            <span class="record-card-value">₱${p.amount_owed.toFixed(2)}</span>
+          </div>
+          <div class="record-card-row">
+            <span class="record-card-label">Partial Paid:</span>
+            <span class="record-card-value">₱${p.partial_paid.toFixed(2)}</span>
+          </div>
+          <div class="record-card-row">
+            <span class="record-card-label">Incurred:</span>
+            <span class="record-card-value">${p.incurred_date}</span>
+          </div>
+        </div>
+        <div class="record-card-footer">
+          ${actionButton}${historyButton}
+        </div>
+      </div>
+    `;
+  });
+
+  cardHtml += '</div>';
+  cardContainer.innerHTML = cardHtml;
+}
+
+function createPayable() {
+  const payload = {
+    creditor_name: document.getElementById('creditorName').value,
+    items_description: document.getElementById('payableDesc').value,
+    amount_owed: document.getElementById('payableAmount').value,
+    incurred_date: document.getElementById('incurredDate').value,
+    due_date: document.getElementById('payableDueDate').value,
+  };
+
+  if (!payload.creditor_name || !payload.items_description || !payload.amount_owed || !payload.due_date) {
+    showToast('Please fill in all required fields.', 'error');
+    return;
+  }
+
+  csrfFetch(`${window.managementBase}/payables/api/payables`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showToast('Payable record logged successfully', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('addPayableModal')).hide();
+      document.getElementById('creditorName').value = '';
+      document.getElementById('payableDesc').value = '';
+      document.getElementById('payableAmount').value = '';
+      document.getElementById('payableDueDate').value = '';
+      document.getElementById('incurredDate').valueAsDate = new Date();
+      loadPayables();
+    } else {
+      showToast(data.error || 'Error logging payable', 'error');
+    }
+  });
+}
+
+function openMarkPayablePaidModal(pId) {
+  const p = payablesCache.find(x => x.id === pId);
+  if (!p) return;
+
+  pendingPayableId = pId;
+  const remaining = p.amount_owed - p.partial_paid;
+  
+  document.getElementById('markPayableSupplier').textContent = p.creditor_name;
+  document.getElementById('markPayableAmount').textContent = '₱' + remaining.toFixed(2);
+  document.getElementById('markPayableDueDate').textContent = p.due_date;
+
+  // Reset payment inputs
+  document.getElementById('paymentTypeFull').checked = true;
+  document.getElementById('payablePaymentMethod').value = '';
+  const payInput = document.getElementById('payAmountInput');
+  payInput.value = '';
+  payInput.max = remaining;
+  
+  togglePaymentTypeFields();
+
+  if (markPayableModalInstance) {
+    markPayableModalInstance.show();
+  }
+}
+
+function togglePaymentTypeFields() {
+  const isPartial = document.getElementById('paymentTypePartial').checked;
+  const container = document.getElementById('partialAmountContainer');
+  const confirmBtn = document.getElementById('confirmPayableMarkPaidBtn');
+  
+  if (isPartial) {
+    container.style.display = 'block';
+    confirmBtn.className = 'btn btn-warning text-dark px-4';
+    confirmBtn.innerHTML = '<i class="bi bi-wallet2 me-1"></i> Confirm Partial Payment';
+    calculateRemainingBalance();
+  } else {
+    container.style.display = 'none';
+    confirmBtn.className = 'btn btn-success px-4';
+    confirmBtn.innerHTML = '<i class="bi bi-check2 me-1"></i> Confirm Paid';
+  }
+}
+
+function calculateRemainingBalance() {
+  const p = payablesCache.find(x => x.id === pendingPayableId);
+  if (!p) return;
+  
+  const remaining = p.amount_owed - p.partial_paid;
+  const payVal = parseFloat(document.getElementById('payAmountInput').value) || 0;
+  
+  const finalRemaining = Math.max(0, remaining - payVal);
+  document.getElementById('remainingBalanceText').textContent = '₱' + finalRemaining.toFixed(2);
+}
+
+function confirmMarkPayablePaid() {
+  if (!pendingPayableId) return;
+
+  const isPartial = document.getElementById('paymentTypePartial').checked;
+  let payload = { payment_method: document.getElementById('payablePaymentMethod').value };
+  payload.cash_box = payload.payment_method === 'cash' ? document.getElementById('payableCashBox').value : null;
+  if (!payload.payment_method) {
+    showToast('Select a payment method.', 'error');
+    return;
+  }
+  if (payload.payment_method === 'cash' && !payload.cash_box) { showToast('Choose the cash box for this payment.', 'error'); return; }
+
+  if (isPartial) {
+    const payVal = parseFloat(document.getElementById('payAmountInput').value);
+    const p = payablesCache.find(x => x.id === pendingPayableId);
+    const remaining = p ? p.amount_owed - p.partial_paid : 0;
+    
+    if (isNaN(payVal) || payVal <= 0) {
+      showToast('Please enter a valid payment amount greater than 0.', 'error');
+      return;
+    }
+    
+    if (payVal > remaining) {
+      showToast(`Payment amount cannot exceed the remaining balance of ₱${remaining.toFixed(2)}.`, 'error');
+      return;
+    }
+    
+    payload.amount = payVal;
+  }
+
+  const btn = document.getElementById('confirmPayableMarkPaidBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Processing…';
+
+  csrfFetch(`${window.managementBase}/payables/api/payables/${pendingPayableId}/mark-paid`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    togglePaymentTypeFields(); // restore original text
+
+    if (data.success) {
+      if (markPayableModalInstance) markPayableModalInstance.hide();
+      pendingPayableId = null;
+      showToast(data.funding_source === 'external' ? 'Supplier payment recorded as externally funded; business balance unchanged.' : isPartial ? 'Partial payment recorded' : 'Payable marked as paid', 'success');
+      loadPayables();
+    } else {
+      showToast(data.error || 'Error saving payment', 'error');
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    togglePaymentTypeFields(); // restore original text
+    showToast('Error saving payment', 'error');
+  });
+}
+
+function showPayableHistory(pId) {
+  const p = payablesCache.find(x => x.id === pId);
+  if (!p) return;
+  document.getElementById('payableHistoryTitle').textContent = `Payment history: ${p.creditor_name}`;
+  const payments = p.payments || [];
+  const history = payments.length ? payments.map(payment => `
+    <tr><td>${new Date(payment.paid_at).toLocaleString('en-PH', {timeZone: 'Asia/Manila'})}</td>
+    <td>₱${payment.amount.toFixed(2)}</td><td>${window.escapeHTML(payment.payment_method)}</td>
+    <td>${window.escapeHTML(payment.paid_by)}</td>
+    <td>${payment.cash_box ? `${payment.cash_box === 'petty' ? 'Petty' : 'Customer'} cash box` : payment.payment_method === 'cash' ? 'Box unknown (older payment)' : payment.funding_source === 'external' ? 'External-funded' : payment.funding_source === 'legacy' ? 'Legacy / funding unknown' : 'Business-funded'}${payment.box_balance_before == null ? '' : `<div class="small text-muted">Box ₱${payment.box_balance_before.toFixed(2)} → ₱${payment.box_balance_after.toFixed(2)}</div>`}</td>
+    <td>₱${payment.balance_before.toFixed(2)} → ₱${payment.balance_after.toFixed(2)}</td>
+    <td>${payment.method_balance_before == null ? 'Unknown' : `₱${payment.method_balance_before.toFixed(2)} → ₱${payment.method_balance_after.toFixed(2)}`}</td></tr>
+  `).join('') : '<tr><td colspan="7">No dated payments recorded.</td></tr>';
+  const legacy = p.legacy_paid_unattributed > 0 ? `<p class="text-warning">₱${p.legacy_paid_unattributed.toFixed(2)} was paid before payment history existed; its date and method are unknown.</p>` : '';
+  document.getElementById('payableHistoryBody').innerHTML = `${legacy}<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Manila time</th><th>Amount</th><th>Method</th><th>Recorded by</th><th>Funding</th><th>Supplier debt before → after</th><th>Business method before → after</th></tr></thead><tbody>${history}</tbody></table></div>`;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('payableHistoryModal')).show();
+}
+</script>
+{% endblock %}

@@ -1,45 +1,114 @@
-# Check-in and Billing with POS Integration for Ideahub
+# IdeaHub — How to Run & Technical Guide
 
-Check-in and Billing with POS Integration for Ideahub is a system for running a cafe and study/work space — the kind of place where students and teams come to work, eat, drink, and use shared spaces like lounges or meeting rooms.
+instructions to set up and run IdeaHub locally, plus a quick guide on how the project is organized.
 
-It helps the shop answer three everyday questions:
+---
 
-- Who is here right now?
-- What did they order?
-- How did they pay when they left?
+## 🚀 How to Run the Project (Step-by-Step)
 
-## For Staff (Day-to-Day)
+Follow these steps to get the app running on your computer.
 
-Staff use it during every shift to:
+### Prerequisites
+Make sure you have installed:
+1. **Python** (version 3.12 or higher)
+2. **MySQL** (or XAMPP with MySQL running)
+3. **Git**
 
-- Check customers in when they arrive (name, number of people, which space they use)
-- Take food and drink orders from the menu
-- Check customers out when they leave, recording whether they paid by Cash or GCash
-- See who is still inside, what spaces are full, and what orders are active
+---
 
-## For the Owner (Management)
+### Step 1: Open the Project Folder
+Open your terminal (or PowerShell on Windows) and go to the project directory:
+```bash
+cd ideahub
+```
 
-The owner uses it to:
+### Step 2: Set Up a Python Virtual Environment
+This keeps project dependencies isolated.
 
-- Track daily sales and see Cash vs GCash totals
-- Review checkout records and end-of-day reports
-- Manage the menu (what’s available, prices, descriptions)
-- Track inventory (stock levels, low-stock alerts)
-- Log expenses and customer debts (receivables)
-- Book spaces like boardrooms
-- Export a daily report (PDF) for record-keeping or their accountant
-- Manage staff accounts and see performance/analytics
+- **Windows (PowerShell):**
+  ```powershell
+  python -m venv .venv
+  .\.venv\Scripts\Activate.ps1
+  ```
+- **Mac / Linux:**
+  ```bash
+  python3 -m venv .venv
+  source .venv/bin/activate
+  ```
 
-## Overview
+### Step 3: Install Required Packages
+Install all required libraries by running:
+```bash
+pip install -r requirements.txt
+```
 
-Check-in and Billing with POS Integration for Ideahub is the digital notebook and cash register for a cafe/workspace business.
+### Step 4: Create the Database
+1. Open XAMPP or your MySQL client (like phpMyAdmin or MySQL Workbench).
+2. Create a new database named `ideahub_pos`:
+   ```sql
+   CREATE DATABASE ideahub_pos;
+   ```
+3. Development defaults to a local SQLite database. To use MySQL locally, set `DATABASE_URL` in your terminal:
+   ```powershell
+   $env:DATABASE_URL="mysql+pymysql://root:your_password@localhost/ideahub_pos"
+   ```
 
-It replaces manual tracking with one system that handles:
+### Step 5: Test the Setup (Optional)
+Check imports and run the isolated automated test suite:
+```bash
+python scripts/validate_imports.py
+python -m pytest -q tests
+```
 
-- Customer check-in/check-out
-- Orders
-- Payments
-- Space usage
-- Daily financial reporting
+### Step 6: Start the App
+Run the main app file:
+```bash
+python app.py
+```
+The app will automatically set up database tables and start running at **`http://localhost:5000`**. Open that link in your web browser!
 
-So the owner always knows who’s in the shop, what was sold, and how much money came in — without spreadsheets or paper logs.
+---
+
+## 📂 Project Structure
+
+Here is how the main files and folders are organized inside `app/`:
+
+- **`app/routes/`**: Web pages and API endpoints (menu, orders, payables, inventory, etc.).
+- **`app/controllers/`**: Controllers for complex sections like analytics, management, and finance.
+- **`app/services/`**: The business logic (calculations, report generation, rules).
+- **`app/repositories/`**: Database queries (getting and saving data to MySQL).
+- **`app/models/`**: Database tables defined with SQLAlchemy (User, Order, MenuItem, Payable, etc.).
+- **`app/templates/`**: HTML screens and pages.
+- **`app/utils/`**: Helpers like `auth.py` (login/role checks) and `uploads.py` (image uploads).
+- **`config/config.py`**: Project settings (database connection, session timeouts, file limits).
+- **`app.py`**: Main file that launches the server.
+
+---
+
+## 🔐 Built-in Security Features
+
+- **Login & Roles**: Pages verify whether a user is logged in as staff or admin before granting access.
+- **Password Safety**: Passwords are saved safely using bcrypt. Accounts lock for 15 minutes after 5 wrong password attempts.
+- **Auto Logout**: Inactive sessions automatically log out after 2 hours.
+- **Safe File Uploads**: Uploaded images check file extensions and headers, resize large images, and rename files with unique IDs to stay safe.
+- **Database Safety**: Queries use standard SQLAlchemy parameters to prevent SQL injection.
+
+---
+
+## 📝 Log Files
+- **`app.log`**: General system activity and application logs.
+- **`security.log`**: Audit log for logins, lockouts, and administrative actions.
+
+---
+
+## 📚 Documentation
+
+- **`MD-Folders/VPS_DEPLOY_GUIDE.md`**: Hostinger VPS deployment and operations.
+- **`MD-Folders/SECURITY.md`**: Application security controls.
+- **`MD-Folders/STAFF_QUICK_START.md`**: Staff and owner usage guide.
+- **`MD-Folders/technicalguide.md`**: Technical architecture reference.
+- **`MD-Folders/SCALING.md`**: Production scaling, health checks, and release safety.
+- **`MD-Folders/OWNER_MAINTENANCE_RUNBOOK.md`**: Owner checklists for VPS,
+  Cloudflare Access, R2, backups, Redis, MySQL, security, releases, and incidents.
+- **`MD-Folders/UI_UX_MOTION_PLAN.md`**: Non-invasive UI motion design,
+  implementation boundaries, and acceptance checks.

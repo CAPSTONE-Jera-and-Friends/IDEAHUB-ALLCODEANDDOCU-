@@ -1,0 +1,922 @@
+{% extends "layout.html" %}
+{% block title %}Space Bookings{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <style>
+    .boardroom-shell .card { border: 0; border-radius: 14px; }
+    .boardroom-shell .card-header { background: #fff; border-bottom: 1px solid #eef0f4; }
+    .legend-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    }
+    .legend-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .slot-available { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+    .slot-booked { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
+    .slot-active { background:#dbeafe; color:#1d4ed8; border:1px solid #93c5fd; }
+    .staff-guide {
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+      border: 1px solid #f0d78c;
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .staff-guide-step {
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 13px; color: #5c4a12; margin-bottom: 8px;
+    }
+    .staff-guide-step:last-child { margin-bottom: 0; }
+    .staff-guide-num {
+      flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+      background: #c9a43a; color: #fff; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .late-hint-badge {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      background: #fff3cd; color: #856404; border: 1px solid #ffc107;
+      border-radius: 6px; padding: 2px 8px; margin-top: 4px;
+    }
+    .edit-time-summary {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .edit-time-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px dashed #e5e7eb;
+      font-size: 14px;
+    }
+    .edit-time-row:last-child { border-bottom: none; }
+    .edit-time-label { color: #6b7280; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .edit-time-value { font-weight: 600; color: #1f2937; }
+    .edit-time-value.new { color: #15803d; }
+    .edit-actions-stack .btn { min-width: 140px; }
+    @media (max-width: 575.98px) {
+      .edit-actions-stack { flex-direction: column; width: 100%; }
+      .edit-actions-stack .btn { width: 100%; }
+    }
+  </style>
+  <div class="boardroom-shell">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-0">Space Bookings</h3>
+      <small id="booking-count" class="text-muted">Loading bookings...</small>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <input type="date" id="scheduleDate" class="form-control" style="width:170px;" onchange="loadSchedule()">
+      <button class="btn btn-warning fw-bold text-white" data-bs-toggle="modal" data-bs-target="#bookingModal">
+        <i class="bi bi-calendar-plus me-1"></i> New Booking
+      </button>
+    </div>
+  </div>
+
+  <div class="staff-guide mb-3">
+    <div class="fw-semibold mb-2" style="color:#7a5f10;">
+      <i class="bi bi-info-circle me-1"></i> Quick guide for staff
+    </div>
+    <div class="staff-guide-step">
+      <span class="staff-guide-num">1</span>
+      <span><strong>Book ahead</strong> — customer reserved a time slot (e.g. 5:00 PM – 8:00 PM).</span>
+    </div>
+    <div class="staff-guide-step">
+      <span class="staff-guide-num">2</span>
+      <span><strong>Customer arrives late?</strong> — tap <strong>Arrived late?</strong>, set when they actually came (or tap <strong>Use current time</strong>), then <strong>Check in now</strong>.</span>
+    </div>
+    <div class="staff-guide-step">
+      <span class="staff-guide-num">3</span>
+      <span><strong>Need more time later?</strong> — after check-in, use <strong>Extend</strong>. End time does not change in step 2.</span>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">Upcoming Bookings</span>
+      <small id="upcoming-count" class="text-muted">Loading...</small>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped mb-0">
+        <thead>
+          <tr><th>Booked for</th><th>Customer</th><th>Space</th><th>Time</th><th>Duration</th><th>Status</th></tr>
+        </thead>
+        <tbody id="upcoming-bookings-list">
+          <tr><td colspan="6" class="text-center text-muted py-3">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">Availability for <span id="schedule-label">—</span></div>
+    <div class="card-body p-2">
+      <div class="d-flex gap-2 flex-wrap px-1 pb-2">
+        <span class="legend-pill" style="background:#ecfdf5;color:#166534;"><span class="legend-dot" style="background:#22c55e;"></span>Available</span>
+        <span class="legend-pill" style="background:#fef2f2;color:#991b1b;"><span class="legend-dot" style="background:#ef4444;"></span>Booked</span>
+        <span class="legend-pill" style="background:#eff6ff;color:#1e40af;"><span class="legend-dot" style="background:#3b82f6;"></span>In Session</span>
+      </div>
+      <div id="schedule-grid" style="display:grid; grid-template-columns: 70px 1fr; gap:3px 6px;"></div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header fw-semibold">Bookings for <span id="list-label">—</span></div>
+    <div class="table-responsive">
+      <table class="table table-striped mb-0">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Time</th>
+            <th>Space / Price</th>
+            <th class="d-none d-md-table-cell">Course</th>
+            <th class="d-none d-md-table-cell">People</th>
+            <th>Status</th>
+            <th class="d-none d-md-table-cell">Purpose</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="bookings-list"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="bookingModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-calendar-check me-2 text-warning"></i>New Booking</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" class="form-control mb-2" id="b-name" placeholder="Customer Name">
+        <label class="form-label small text-muted mb-1" for="b-type">Reserve</label>
+        <select id="b-type" class="form-select mb-2" onchange="bookingTypeChanged()">
+          <option value="boardroom">Boardroom</option>
+          <option value="whole_hub">Whole Hub — ₱500/hour (all spaces)</option>
+        </select>
+        <input type="date" class="form-control mb-2" id="b-date">
+        <div class="row g-2 mb-1">
+          <div class="col">
+            <label class="form-label small text-muted mb-1">Start Time</label>
+            <div class="d-flex gap-1">
+              <select id="b-start-hour" class="form-select"></select>
+              <select id="b-start-min" class="form-select">
+                <option value="00">00</option>
+                <option value="30">30</option>
+              </select>
+              <select id="b-start-period" class="form-select">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+          <div class="col">
+            <label class="form-label small text-muted mb-1">End Time</label>
+            <div class="d-flex gap-1">
+              <select id="b-end-hour" class="form-select"></select>
+              <select id="b-end-min" class="form-select">
+                <option value="00">00</option>
+                <option value="30">30</option>
+              </select>
+              <select id="b-end-period" class="form-select">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <small class="text-muted d-block mb-2">Booking hours: 7:00 AM to 10:00 PM</small>
+        <div id="boardroom-price-field" class="mb-2">
+          <label class="form-label small text-muted mb-1" for="b-hourly-rate">Boardroom price per hour (₱)</label>
+          <input type="number" id="b-hourly-rate" class="form-control" min="0" max="100000" step="0.01" value="250">
+          <small class="text-muted">Default ₱250. Enter the agreed price for this booking.</small>
+        </div>
+        <small id="whole-hub-price-note" class="text-muted d-none mb-2">Whole Hub is ₱500 per hour and reserves all three spaces.</small>
+        <input type="text" class="form-control mb-2" id="b-course" placeholder="Course (optional)">
+        <input type="number" class="form-control mb-2" id="b-people" min="1" placeholder="Number of People">
+        <input type="text" class="form-control" id="b-purpose" placeholder="Purpose (optional)">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-outline-primary" onclick="submitBooking(true, this)">Walk in now (1 hour)</button>
+        <button class="btn btn-warning fw-bold text-white" onclick="submitBooking(false, this)">Save Advance Booking</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editBookingModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-clock-history me-2 text-warning"></i>Customer arrived late?
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="mb-3 text-muted small">
+          Change <strong>when they actually arrived</strong>. Their <strong>leave-by time stays the same</strong>.
+        </p>
+        <p class="h6 mb-3" id="edit-customer-name">—</p>
+
+        <div class="edit-time-summary mb-3">
+          <div class="edit-time-row">
+            <span class="edit-time-label">Originally booked</span>
+            <span class="edit-time-value" id="edit-preview-original">—</span>
+          </div>
+          <div class="edit-time-row">
+            <span class="edit-time-label">After this change</span>
+            <span class="edit-time-value new" id="edit-preview-new">—</span>
+          </div>
+          <div class="edit-time-row">
+            <span class="edit-time-label">Must leave by</span>
+            <span class="edit-time-value" id="edit-preview-end">—</span>
+          </div>
+        </div>
+
+        <div id="edit-late-tip" class="alert alert-warning py-2 small mb-3" style="display:none;">
+          <i class="bi bi-lightbulb me-1"></i>
+          Tip: tap <strong>Use current time</strong> if they just walked in.
+        </div>
+
+        <label class="form-label fw-semibold mb-1">When did they actually arrive?</label>
+        <div class="d-flex gap-1 flex-wrap mb-2">
+          <select id="e-start-hour" class="form-select" style="max-width:88px;" onchange="updateEditPreview()"></select>
+          <select id="e-start-min" class="form-select" style="max-width:88px;" onchange="updateEditPreview()"></select>
+          <select id="e-start-period" class="form-select" style="max-width:88px;" onchange="updateEditPreview()">
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+          <button type="button" class="btn btn-outline-primary btn-sm ms-auto" onclick="setStartToNow(true)">
+            <i class="bi bi-arrow-clockwise me-1"></i>Use current time
+          </button>
+        </div>
+        <p class="text-muted small mb-0">
+          Need to stay longer? After check-in, use <strong>Extend</strong> on the booking list.
+        </p>
+      </div>
+      <div class="modal-footer flex-column align-items-stretch border-0 pt-0">
+        <div class="d-flex flex-wrap gap-2 justify-content-end edit-actions-stack w-100">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-outline-warning" onclick="submitEditBooking(false)">
+            Save time only
+          </button>
+          <button type="button" class="btn btn-primary fw-semibold" onclick="confirmSaveAndStart()">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Check in now
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="extendModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-hourglass-split me-2"></i>Stay longer?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">Add extra time to the session. The customer can stay past their original end time.</p>
+        <label class="form-label small text-muted mb-1">Hours</label>
+        <select id="extend-hours" class="form-select mb-2">
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+        </select>
+        <label class="form-label small text-muted mb-1">Minutes</label>
+        <select id="extend-minutes" class="form-select">
+          <option value="0">0</option>
+          <option value="15">15</option>
+          <option value="30">30</option>
+          <option value="45">45</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="submitExtend()">Add extra time</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="actionConfirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirm-title">Confirm Action</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="confirm-message">Are you sure?</div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+        <button class="btn btn-danger" id="confirm-ok-btn">Yes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="bookingHistoryModal" tabindex="-1" aria-labelledby="bookingHistoryTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="bookingHistoryTitle">Booking history</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="booking-history-body"></div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function escapeBookingText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtDate(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+}
+function toMinutes(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+function fmt12(hhmm) {
+  const [hRaw, m] = hhmm.split(":").map(Number);
+  const period = hRaw >= 12 ? "PM" : "AM";
+  const h12 = (hRaw % 12) || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+function minutesTo12(totalMinutes) {
+  const h24 = Math.floor(totalMinutes / 60);
+  const min = totalMinutes % 60;
+  return fmt12(`${String(h24).padStart(2, "0")}:${String(min).padStart(2, "0")}`);
+}
+function to24Hour(hour, minute, period) {
+  let h = parseInt(hour, 10);
+  if (period === "AM" && h === 12) h = 0;
+  if (period === "PM" && h !== 12) h += 12;
+  return `${String(h).padStart(2, "0")}:${minute}`;
+}
+function buildHourOptions() {
+  return Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"))
+    .map(h => `<option value="${h}">${h}</option>`)
+    .join("");
+}
+function buildMinuteOptions() {
+  return Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))
+    .map(m => `<option value="${m}">${m}</option>`)
+    .join("");
+}
+function setSelectorsFrom24Hour(hhmm, hourId, minId, periodId) {
+  const [hRaw, m] = hhmm.split(":").map(Number);
+  const period = hRaw >= 12 ? "PM" : "AM";
+  const h12 = (hRaw % 12) || 12;
+  document.getElementById(hourId).value = String(h12).padStart(2, "0");
+  document.getElementById(minId).value = String(m).padStart(2, "0");
+  document.getElementById(periodId).value = period;
+}
+function initTimeSelectors() {
+  const minuteOptions = buildMinuteOptions();
+  const hourOptions = buildHourOptions();
+  document.getElementById("b-start-hour").innerHTML = hourOptions;
+  document.getElementById("b-end-hour").innerHTML = hourOptions;
+  document.getElementById("b-start-min").innerHTML = minuteOptions;
+  document.getElementById("b-end-min").innerHTML = minuteOptions;
+
+  document.getElementById("b-start-hour").value = "07";
+  document.getElementById("b-start-min").value = "00";
+  document.getElementById("b-start-period").value = "AM";
+  document.getElementById("b-end-hour").value = "08";
+  document.getElementById("b-end-min").value = "00";
+  document.getElementById("b-end-period").value = "AM";
+}
+function bookingTypeChanged() {
+  const wholeHub = document.getElementById('b-type').value === 'whole_hub';
+  const rateField = document.getElementById('boardroom-price-field');
+  if (rateField) rateField.classList.toggle('d-none', wholeHub);
+  document.getElementById('whole-hub-price-note').classList.toggle('d-none', !wholeHub);
+}
+function initEditTimeSelectors() {
+  document.getElementById("e-start-hour").innerHTML = buildHourOptions();
+  document.getElementById("e-start-min").innerHTML = buildMinuteOptions();
+}
+function badgeFor(status) {
+  if (status === "active") return `<span class="badge text-bg-primary">Active</span>`;
+  if (status === "completed") return `<span class="badge text-bg-success">Completed</span>`;
+  if (status === "cancelled") return `<span class="badge text-bg-secondary">Cancelled</span>`;
+  return `<span class="badge text-bg-warning text-dark">Booked</span>`;
+}
+
+let bookingsCache = [];
+let editBookingId = null;
+let editBookingEndTime = null;
+let editBookingOriginalStart = null;
+let extendBookingId = null;
+let pendingConfirmAction = null;
+
+function nowTime24() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function isBookingLate(b) {
+  if (!b || b.status !== "booked" || !b.can_start) return false;
+  const nowMins = toMinutes(nowTime24());
+  return nowMins > toMinutes(b.start_time);
+}
+
+function setStartToNow(showMessage) {
+  setSelectorsFrom24Hour(nowTime24(), "e-start-hour", "e-start-min", "e-start-period");
+  updateEditPreview();
+  if (showMessage !== false) {
+    showToast("Start time set to right now.", "info");
+  }
+}
+
+function updateEditPreview() {
+  if (!editBookingEndTime) return;
+  const newStart = to24Hour(
+    document.getElementById("e-start-hour").value,
+    document.getElementById("e-start-min").value,
+    document.getElementById("e-start-period").value
+  );
+  const origLabel = editBookingOriginalStart
+    ? `${fmt12(editBookingOriginalStart)} – ${fmt12(editBookingEndTime)}`
+    : "—";
+  document.getElementById("edit-preview-original").textContent = origLabel;
+  document.getElementById("edit-preview-new").textContent = `${fmt12(newStart)} – ${fmt12(editBookingEndTime)}`;
+  document.getElementById("edit-preview-end").textContent = fmt12(editBookingEndTime);
+}
+
+document.getElementById("scheduleDate").value = todayStr();
+document.getElementById("b-date").value = todayStr();
+initTimeSelectors();
+initEditTimeSelectors();
+bookingTypeChanged();
+
+function loadSchedule() {
+  const date = document.getElementById("scheduleDate").value || todayStr();
+  document.getElementById("schedule-label").textContent = fmtDate(date);
+  document.getElementById("list-label").textContent = fmtDate(date);
+  loadUpcomingBookings();
+
+  fetch(`/api/lounge-bookings?date=${date}`, { credentials: "include" })
+    .then(r => r.json())
+    .then(bookings => {
+      bookingsCache = bookings;
+      renderSchedule(bookings);
+      renderList(bookings);
+      document.getElementById("booking-count").textContent = `${bookings.length} booking(s)`;
+    })
+    .catch(() => showToast("Failed to load bookings.", "error"));
+}
+
+function loadUpcomingBookings() {
+  fetch('/api/lounge-bookings?status=open', { credentials: 'include' })
+    .then(r => {
+      if (!r.ok) throw new Error('Could not load upcoming bookings');
+      return r.json();
+    })
+    .then(bookings => {
+      const upcoming = bookings.filter(b => b.date >= todayStr());
+      const body = document.getElementById('upcoming-bookings-list');
+      document.getElementById('upcoming-count').textContent = `${upcoming.length} upcoming`;
+      body.innerHTML = upcoming.length ? upcoming.map(b => {
+        const minutes = toMinutes(b.end_time) - toMinutes(b.start_time);
+        const duration = `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}`;
+        return `<tr>
+          <td>${escapeBookingText(fmtDate(b.date))}</td>
+          <td>${escapeBookingText(b.customer_name)}<br><small class="text-muted">Booked by ${escapeBookingText(b.booked_by || 'Unknown')}</small></td>
+          <td>${b.booking_type === 'whole_hub' ? 'Whole Hub' : 'Boardroom'}</td>
+          <td>${fmt12(b.start_time)} – ${fmt12(b.end_time)}</td>
+          <td>${duration}</td>
+          <td>${badgeFor(b.status)}</td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="6" class="text-center text-muted py-3">No upcoming bookings.</td></tr>';
+    })
+    .catch(() => {
+      document.getElementById('upcoming-count').textContent = 'Unavailable';
+      document.getElementById('upcoming-bookings-list').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Could not load upcoming bookings.</td></tr>';
+    });
+}
+
+function renderSchedule(bookings) {
+  const grid = document.getElementById("schedule-grid");
+  grid.innerHTML = "";
+
+  const DAY_START = 7 * 60;
+  const DAY_END = 22 * 60;
+  const SLOT_MINS = 30;
+
+  for (let m = DAY_START; m < DAY_END; m += SLOT_MINS) {
+    const label = minutesTo12(m);
+    const slotEnd = m + SLOT_MINS;
+
+    const hit = bookings.find(b => {
+      const bs = toMinutes(b.start_time);
+      const be = toMinutes(b.end_time) + 10; // Free time to leave after the booking ends.
+      return bs < slotEnd && be > m && (b.status === "booked" || b.status === "active");
+    });
+
+    const lbl = document.createElement("div");
+    lbl.style.cssText = "font-size:11px;color:#6b7280;text-align:right;padding-top:2px;";
+    lbl.textContent = label;
+
+    const slot = document.createElement("div");
+    const busyStyle = hit && hit.status === "active"
+      ? "background:#dbeafe; color:#1d4ed8; border:1px solid #93c5fd;"
+      : "background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;";
+    slot.style.cssText = `
+      height:28px;border-radius:5px;display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:500;
+      ${hit ? busyStyle : "background:#dcfce7; color:#15803d; border:1px solid #86efac;"}
+    `;
+    slot.textContent = hit
+      ? `${hit.status === "active" ? "● In Session" : "⛔ Booked"} ${hit.booking_type === 'whole_hub' ? 'Whole Hub' : 'Boardroom'} — ${hit.customer_name} (${fmt12(hit.start_time)}-${fmt12(hit.end_time)})`
+      : "✓ Available";
+
+    grid.appendChild(lbl);
+    grid.appendChild(slot);
+  }
+}
+
+function renderList(bookings) {
+  const tbody = document.getElementById("bookings-list");
+  if (!bookings.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">No bookings for this date.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = bookings.map(b => {
+    const late = isBookingLate(b);
+    let actions = "";
+    if (b.status === "booked") {
+      actions += `<button class="btn btn-sm btn-outline-warning me-1" title="Customer came later than booked time" onclick="editBooking(${b.id})"><i class="bi bi-clock me-1"></i>Arrived late?</button>`;
+    }
+    if (b.status === "booked" && b.can_start) {
+      actions += `<button class="btn btn-sm btn-primary me-1" title="Put customer on Dashboard as active" onclick="startBooking(${b.id})"><i class="bi bi-box-arrow-in-right me-1"></i>Check in</button>`;
+    }
+    if (b.status === "active") {
+      actions += `<button class="btn btn-sm btn-outline-primary me-1" title="Add more time" onclick="extendBooking(${b.id})">Extend</button>`;
+      actions += `<button class="btn btn-sm btn-outline-success me-1" onclick="goToOrder(${b.session_id})">Order</button>`;
+      actions += `<button class="btn btn-sm btn-outline-warning me-1" onclick="goToCheckout(${b.session_id})">Checkout</button>`;
+    }
+    if (b.status === "booked") {
+      actions += `<button class="btn btn-sm btn-outline-danger" title="Cancel this reservation" onclick="cancelBooking(${b.id})">Cancel</button>`;
+    }
+    actions += `<button class="btn btn-sm btn-outline-secondary ms-1" onclick="showBookingHistory(${b.id})">History</button>`;
+
+    const timeCell = late
+      ? `${fmt12(b.start_time)} – ${fmt12(b.end_time)}<br><span class="late-hint-badge"><i class="bi bi-exclamation-circle me-1"></i>Waiting — was due ${fmt12(b.start_time)}</span>`
+      : `${fmt12(b.start_time)} – ${fmt12(b.end_time)}`;
+
+    const purposeText = escapeBookingText(b.purpose || "N/A");
+    return `
+      <tr>
+        <td>${escapeBookingText(b.customer_name)}</td>
+        <td>${timeCell}</td>
+        <td>${b.booking_type === 'whole_hub' ? 'Whole Hub' : 'Boardroom'}<br><small>₱${Number(b.hourly_rate).toFixed(2)}/hr</small><br><small>Set by ${escapeBookingText(b.booked_by || 'Unknown')}</small></td>
+        <td class="d-none d-md-table-cell">${escapeBookingText(b.course || "N/A")}</td>
+        <td class="d-none d-md-table-cell">${b.number_of_people}</td>
+        <td>${badgeFor(b.status)}</td>
+        <td class="d-none d-md-table-cell">${purposeText}</td>
+        <td class="text-end">${actions}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+async function showBookingHistory(bookingId) {
+  const body = document.getElementById("booking-history-body");
+  body.textContent = "Loading history...";
+  bootstrap.Modal.getOrCreateInstance(document.getElementById("bookingHistoryModal")).show();
+  try {
+    const response = await fetch(`/api/lounge-bookings/${bookingId}/history`, { credentials: "include" });
+    if (!response.ok) throw new Error("History unavailable");
+    const changes = await response.json();
+    if (!changes.length) {
+      body.textContent = "No change history was recorded for this booking.";
+      return;
+    }
+    body.innerHTML = `<p class="small text-muted">Booking amounts are quotes until checkout. Daily Balance counts the checkout payment once.</p>` +
+      changes.map(change => {
+        const before = change.before_state;
+        const after = change.after_state;
+        const oldTime = before ? `${before.start_time}–${before.end_time}` : "—";
+        const newTime = `${after.start_time}–${after.end_time}`;
+        const amountLabel = change.action === "checked_out" ? "Collected" : "Quote";
+        const amount = change.action === "checked_out"
+          ? `₱${change.amount_after.toFixed(2)} via ${escapeBookingText(change.payment_method || "unknown")}`
+          : `₱${change.amount_before.toFixed(2)} → ₱${change.amount_after.toFixed(2)}`;
+        const when = new Date(change.event_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" });
+        return `<div class="border-bottom py-2">
+          <div class="fw-semibold">${escapeBookingText(change.action.replaceAll("_", " "))}</div>
+          <div class="small">${escapeBookingText(oldTime)} → ${escapeBookingText(newTime)} · ${amountLabel}: ${amount}</div>
+          <div class="small text-muted">${escapeBookingText(when)} · ${escapeBookingText(change.actor)}</div>
+        </div>`;
+      }).join("");
+  } catch (_) {
+    body.textContent = "Could not load booking history.";
+  }
+}
+
+async function submitBooking(walkIn = false, button) {
+  let startTime = to24Hour(
+    document.getElementById("b-start-hour").value,
+    document.getElementById("b-start-min").value,
+    document.getElementById("b-start-period").value
+  );
+  let endTime = to24Hour(
+    document.getElementById("b-end-hour").value,
+    document.getElementById("b-end-min").value,
+    document.getElementById("b-end-period").value
+  );
+
+  if (walkIn) {
+    const now = new Date();
+    const end = new Date(now.getTime() + 60 * 60000);
+    const opening = new Date(now); opening.setHours(7, 0, 0, 0);
+    const closing = new Date(now); closing.setHours(22, 0, 0, 0);
+    if (now < opening || end > closing) {
+      showToast('Walk-ins must fit within 7:00 AM to 10:00 PM.', 'error');
+      return;
+    }
+    startTime = nowTime24();
+    endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+    document.getElementById('b-date').value = todayStr();
+  }
+  const payload = {
+    customer_name: document.getElementById("b-name").value.trim(),
+    date: document.getElementById("b-date").value,
+    start_time: startTime,
+    end_time: endTime,
+    course: document.getElementById("b-course").value.trim(),
+    number_of_people: document.getElementById("b-people").value,
+    purpose: document.getElementById("b-purpose").value.trim(),
+    booking_type: document.getElementById('b-type').value,
+    walk_in: walkIn
+  };
+  const rateInput = document.getElementById('b-hourly-rate');
+  if (rateInput && payload.booking_type === 'boardroom') payload.hourly_rate = rateInput.value;
+
+  if (!payload.customer_name || !payload.date || !payload.start_time || !payload.end_time || !payload.number_of_people) {
+    showToast("Please fill in all required fields.", "error");
+    return;
+  }
+  const startMins = toMinutes(payload.start_time);
+  const endMins = toMinutes(payload.end_time);
+  if (startMins < 7 * 60 || endMins > 22 * 60) {
+    showToast("Booking must be within 7:00 AM to 10:00 PM.", "error");
+    return;
+  }
+  if (endMins <= startMins) {
+    showToast("End time must be after start time.", "error");
+    return;
+  }
+
+  try {
+    const data = await runButtonAction(button, { label: 'Saving booking...', slowLabel: 'Still saving...' }, key => fetchJSON('/api/book-lounge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+      body: JSON.stringify(payload)
+    }));
+    if (!data) return;
+    showToast(walkIn ? 'Customer checked in — see the Dashboard.' : 'Booking saved.', 'success');
+    bootstrap.Modal.getInstance(document.getElementById("bookingModal")).hide();
+    document.getElementById("scheduleDate").value = payload.date;
+    ["b-name", "b-course", "b-people", "b-purpose"].forEach(id => document.getElementById(id).value = "");
+    initTimeSelectors();
+    document.getElementById('b-type').value = 'boardroom';
+    if (rateInput) rateInput.value = '250';
+    bookingTypeChanged();
+    loadSchedule();
+  } catch (error) {
+    showToast(error.message || 'Failed to create booking.', 'error');
+  }
+}
+
+function startBooking(id) {
+  return csrfFetch(`/api/lounge-bookings/${id}/start`, {
+    method: "POST"
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, "error");
+      return false;
+    }
+    showToast("Customer checked in — see them on the Dashboard.", "success");
+    loadSchedule();
+    return true;
+  })
+  .catch(() => {
+    showToast("Failed to start session.", "error");
+    return false;
+  });
+}
+
+function editBooking(id) {
+  const b = bookingsCache.find(x => x.id === id);
+  if (!b || b.status !== "booked") return;
+
+  editBookingId = id;
+  editBookingEndTime = b.end_time;
+  editBookingOriginalStart = b.start_time;
+
+  document.getElementById("edit-customer-name").textContent = b.customer_name;
+
+  const late = isBookingLate(b);
+  document.getElementById("edit-late-tip").style.display = late ? "block" : "none";
+
+  if (late) {
+    setStartToNow(false);
+  } else {
+    setSelectorsFrom24Hour(b.start_time, "e-start-hour", "e-start-min", "e-start-period");
+    updateEditPreview();
+  }
+
+  const modal = new bootstrap.Modal(document.getElementById("editBookingModal"));
+  modal.show();
+}
+
+function submitEditBooking(startAfterSave) {
+  if (!editBookingId) return;
+
+  const startTime = to24Hour(
+    document.getElementById("e-start-hour").value,
+    document.getElementById("e-start-min").value,
+    document.getElementById("e-start-period").value
+  );
+
+  const startMins = toMinutes(startTime);
+  if (startMins < 7 * 60 || startMins > 22 * 60) {
+    showToast("Start time must be within 7:00 AM to 10:00 PM.", "error");
+    return Promise.resolve(false);
+  }
+
+  return csrfFetch(`/api/lounge-bookings/${editBookingId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ start_time: startTime })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, "error");
+      return false;
+    }
+    showToast(startAfterSave ? "Time saved." : "Arrival time updated.", "success");
+    const modal = bootstrap.Modal.getInstance(document.getElementById("editBookingModal"));
+    if (modal) modal.hide();
+
+    const id = editBookingId;
+    editBookingId = null;
+    editBookingEndTime = null;
+    editBookingOriginalStart = null;
+
+    return loadSchedulePromise().then(() => {
+      if (startAfterSave) return startBooking(id);
+      return true;
+    });
+  })
+  .catch(() => {
+    showToast("Failed to update booking.", "error");
+    return false;
+  });
+}
+
+function loadSchedulePromise() {
+  const date = document.getElementById("scheduleDate").value || todayStr();
+  loadUpcomingBookings();
+  return fetch(`/api/lounge-bookings?date=${date}`, { credentials: "include" })
+    .then(r => r.json())
+    .then(bookings => {
+      bookingsCache = bookings;
+      renderSchedule(bookings);
+      renderList(bookings);
+      document.getElementById("booking-count").textContent = `${bookings.length} booking(s)`;
+    });
+}
+
+function confirmSaveAndStart() {
+  const preview = document.getElementById("edit-preview-new").textContent || "";
+  openConfirmModal(
+    "Check in this customer?",
+    `They will appear on the Dashboard with this time slot: ${preview}. Continue?`,
+    () => submitEditBooking(true),
+    { confirmText: "Check in", confirmClass: "btn-primary" }
+  );
+}
+
+let confirmModalInstance = null;
+
+function openConfirmModal(title, message, onConfirm, options) {
+  options = options || {};
+  document.getElementById("confirm-title").textContent = title;
+  document.getElementById("confirm-message").textContent = message;
+  const okBtn = document.getElementById("confirm-ok-btn");
+  okBtn.textContent = options.confirmText || "Yes";
+  okBtn.className = "btn px-4 " + (options.confirmClass || "btn-danger");
+  pendingConfirmAction = onConfirm;
+  if (!confirmModalInstance) {
+    const modalEl = document.getElementById("actionConfirmModal");
+    confirmModalInstance = new bootstrap.Modal(modalEl);
+    modalEl.addEventListener("hidden.bs.modal", () => {
+      pendingConfirmAction = null;
+    });
+  }
+  confirmModalInstance.show();
+}
+
+document.getElementById("confirm-ok-btn").addEventListener("click", () => {
+  if (confirmModalInstance) confirmModalInstance.hide();
+  if (typeof pendingConfirmAction === "function") {
+    pendingConfirmAction();
+  }
+  pendingConfirmAction = null;
+});
+
+function extendBooking(id) {
+  extendBookingId = id;
+  document.getElementById("extend-hours").value = "0";
+  document.getElementById("extend-minutes").value = "15";
+  const modal = new bootstrap.Modal(document.getElementById("extendModal"));
+  modal.show();
+}
+
+function submitExtend() {
+  if (!extendBookingId) return;
+  const hours = parseInt(document.getElementById("extend-hours").value, 10) || 0;
+  const mins = parseInt(document.getElementById("extend-minutes").value, 10) || 0;
+  const minutes = (hours * 60) + mins;
+  if (minutes <= 0) {
+    showToast("Please select a valid extend time.", "error");
+    return;
+  }
+
+  csrfFetch(`/api/lounge-bookings/${extendBookingId}/extend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ minutes })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, "error");
+      return;
+    }
+    showToast(`Extra time added — now ends at ${fmt12(data.end_time)}.`, "success");
+    const modal = bootstrap.Modal.getInstance(document.getElementById("extendModal"));
+    if (modal) modal.hide();
+    extendBookingId = null;
+    loadSchedule();
+  })
+  .catch(() => showToast("Failed to extend booking.", "error"));
+}
+
+function cancelBooking(id) {
+  openConfirmModal(
+    "Cancel this booking?",
+    "The customer will not be checked in. You can create a new booking if they come back later.",
+    () => {
+      csrfFetch(`/api/lounge-bookings/${id}`, {
+        method: "DELETE"
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          showToast(data.error, "error");
+          return;
+        }
+        showToast("Booking cancelled.", "success");
+        loadSchedule();
+      })
+      .catch(() => showToast("Failed to cancel booking.", "error"));
+    }
+  );
+}
+
+function goToOrder(sessionId) {
+  window.location.href = `/order/${sessionId}`;
+}
+
+function goToCheckout(sessionId) {
+  window.location.href = "/dashboard";
+  setTimeout(() => showToast(`Open View Order for session #${sessionId} to checkout.`, "info"), 300);
+}
+
+loadSchedule();
+window.createSmartPoller(loadSchedule, 30000, { runImmediately: false });
+</script>
+{% endblock %}

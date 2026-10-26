@@ -1,0 +1,1090 @@
+{% extends "layout.html" %}
+
+{% block title %}Menu Management - IdeaFlow{% endblock %}
+
+{% block content %}
+
+<style>
+  .menu-container {
+    padding: 2rem 0;
+  }
+
+  .menu-header {
+    margin-bottom: 3rem;
+  }
+
+  .menu-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 0.5rem;
+  }
+
+  .menu-header p {
+    color: #666;
+    font-size: 1rem;
+  }
+
+  .category-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .category-tab {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 50px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    color: #666;
+  }
+
+  .category-tab:hover {
+    border-color: #ff8c42;
+    color: #ff8c42;
+  }
+
+  .category-tab.active {
+    background: #ff8c42;
+    border-color: #ff8c42;
+    color: white;
+  }
+
+  .btn-add-menu {
+    background: #ff8c42;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 50px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-add-menu:hover {
+    background: #ff7a2a;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 140, 66, 0.3);
+  }
+
+  .search-container {
+    flex: 1;
+    min-width: 250px;
+    max-width: 400px;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 0.75rem 1.25rem 0.75rem 2.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat;
+    background-position: 0.75rem center;
+    background-size: 18px;
+    padding-left: 2.5rem;
+  }
+
+  .search-input:focus {
+    outline: none;
+    border-color: #ff8c42;
+    box-shadow: 0 0 0 3px rgba(255, 140, 66, 0.1);
+  }
+
+  .search-input::placeholder {
+    color: #999;
+  }
+
+  .menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+
+  .menu-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .menu-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .menu-card-image {
+    width: 100%;
+    height: 200px;
+    background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .menu-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .menu-card-image-placeholder {
+    font-size: 3rem;
+    color: #ccc;
+  }
+
+  .menu-card-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #ff8c42;
+    color: white;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .menu-card-body {
+    padding: 1.5rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .menu-card-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+  }
+
+  .menu-card-category {
+    color: #999;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .menu-card-price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ff8c42;
+    margin-bottom: 1rem;
+    margin-top: auto;
+  }
+
+  .menu-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 1rem;
+  }
+
+  .btn-icon {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .btn-edit {
+    background: #e3f2fd;
+    color: #2196f3;
+  }
+
+  .btn-edit:hover {
+    background: #2196f3;
+    color: white;
+  }
+
+  .btn-toggle {
+    background: #f3e5f5;
+    color: #9c27b0;
+  }
+
+  .btn-toggle:hover {
+    background: #9c27b0;
+    color: white;
+  }
+
+  .btn-delete {
+    background: #ffebee;
+    color: #f44336;
+  }
+
+  .btn-delete:hover {
+    background: #f44336;
+    color: white;
+  }
+
+  .modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  }
+
+  .modal-header {
+    background: linear-gradient(135deg, #ff8c42 0%, #ff7a2a 100%);
+    color: white;
+    border: none;
+    padding: 1.5rem;
+  }
+
+  .modal-header .btn-close {
+    filter: invert(1);
+  }
+
+  .form-label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-control,
+  .form-select {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    border-color: #ff8c42;
+    box-shadow: 0 0 0 0.2rem rgba(255, 140, 66, 0.1);
+  }
+
+  .image-preview {
+    width: 100%;
+    max-height: 200px;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+    object-fit: cover;
+    display: none;
+  }
+
+  .image-preview.show {
+    display: block;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #999;
+  }
+
+  .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h3 {
+    color: #666;
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    color: #999;
+    margin-bottom: 1.5rem;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .status-available {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  .status-unavailable {
+    background: #ffebee;
+    color: #c62828;
+  }
+
+  .header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .menu-header h1 {
+      font-size: 2rem;
+    }
+
+    .menu-grid {
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .category-tabs {
+      gap: 0.5rem;
+    }
+
+    .category-tab {
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+    }
+
+    .header-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .btn-add-menu {
+      width: 100%;
+    }
+  }
+</style>
+
+<div class="container-fluid menu-container">
+  <!-- Header -->
+  <div class="menu-header">
+    <h1> Menu Management</h1>
+    <p>Manage your menu items across Main Dish, Snacks, and Beverages categories</p>
+  </div>
+
+  <!-- Header Controls -->
+  <div class="header-controls">
+    <div class="search-container">
+      <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search menu items...">
+    </div>
+    <div class="category-tabs" id="categoryTabs">
+      <div class="category-tab active" data-category="All">All Items</div>
+    </div>
+    <button class="btn-add-menu" data-bs-toggle="modal" data-bs-target="#addItemModal">
+      + Add Menu Item
+    </button>
+    <button class="btn-add-menu" style="background: #2e7d32; margin-left: 0.5rem;" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+      + Add Category
+    </button>
+    <button id="btnAddVariants" class="btn-add-menu" style="display: none; margin-left: 0.5rem;" data-bs-toggle="modal"
+      data-bs-target="#variantModal">
+      + Add Beverage Variants
+    </button>
+  </div>
+
+  <!-- Menu Grid -->
+  <div class="menu-grid" id="menuGrid"></div>
+
+  <!-- Empty State -->
+  <div class="empty-state" id="emptyState" style="display: none;">
+    <div class="empty-state-icon">📭</div>
+    <h3>No menu items yet</h3>
+    <p>Start by adding your first menu item</p>
+  </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">➕ Add New Menu Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addItemForm" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Item Name *</label>
+            <input type="text" id="itemName" class="form-control" placeholder="e.g., Grilled Chicken" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Category *</label>
+            <select id="category" class="form-select" required>
+              <option value="">Select category...</option>
+              <option value="Main Dish">Main Dish</option>
+              <option value="Snack">Snack</option>
+              <option value="Beverages">Beverages</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Price (₱) *</label>
+            <input type="number" id="price" class="form-control" placeholder="0.00" step="0.01" min="0" required>
+          </div>
+          <fieldset class="mb-3">
+            <legend class="form-label fs-6">Optional meal changes</legend>
+            <label class="form-check"><input class="form-check-input" type="checkbox" id="canRemoveRice"> Allow no rice (−₱18)</label>
+            <label class="form-check"><input class="form-check-input" type="checkbox" id="canRemoveEgg"> Allow no egg (−₱18)</label>
+            <small class="form-text text-muted">Orders still use one finished serving. Enter raw rice and egg stock separately in Inventory.</small>
+          </fieldset>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea id="description" class="form-control" placeholder="Brief description of the item"
+              rows="3"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Picture Upload</label>
+            <input type="file" id="image" class="form-control" accept="image/*">
+            <img id="imagePreview1" class="image-preview" alt="Preview">
+            <small class="form-text text-muted">Supported formats: PNG, JPG, GIF, WebP (Max 5MB)</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn-add-menu" onclick="createItem()">Create Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);">
+        <h5 class="modal-title">📁 Add New Category</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addCategoryForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Category Name *</label>
+            <input type="text" id="categoryName" class="form-control" placeholder="e.g., Dessert" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success" onclick="createCategory()">Create Category</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Beverage Variants Modal -->
+<div class="modal fade" id="variantModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">☕ Add Beverage Variants</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="variantForm" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Base name *</label>
+            <input type="text" id="variantBaseName" class="form-control" placeholder="e.g., Latte" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Variant labels *</label>
+            <input type="text" id="variantLabels" class="form-control" placeholder="e.g., Hot,Iced" required>
+            <div class="form-text text-muted">Comma-separated. Each label becomes a variant prefix.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Variant prices (₱) *</label>
+            <input type="text" id="variantPrices" class="form-control" placeholder="e.g., 80,95" required>
+            <div class="form-text text-muted">Must match the number of labels.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea id="variantDescription" class="form-control" placeholder="Shared description for all variants"
+              rows="3"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Picture Upload</label>
+            <input type="file" id="variantImage" class="form-control" accept="image/*">
+            <img id="variantImagePreview" class="image-preview" alt="Preview">
+            <small class="form-text text-muted">Leave empty to create variants without a picture</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn-add-menu" onclick="createBeverageVariants()">Create Variants</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div class="modal fade" id="editItemModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">✏️ Edit Menu Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="editItemForm" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Item Name *</label>
+            <input type="text" id="editItemName" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Category *</label>
+            <select id="editCategory" class="form-select" required>
+              <option value="">Select category...</option>
+              <option value="Main Dish">Main Dish</option>
+              <option value="Snack">Snack</option>
+              <option value="Beverages">Beverages</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Price (₱) *</label>
+            <input type="number" id="editPrice" class="form-control" step="0.01" min="0" required>
+          </div>
+          <fieldset class="mb-3">
+            <legend class="form-label fs-6">Optional meal changes</legend>
+            <label class="form-check"><input class="form-check-input" type="checkbox" id="editCanRemoveRice"> Allow no rice (−₱18)</label>
+            <label class="form-check"><input class="form-check-input" type="checkbox" id="editCanRemoveEgg"> Allow no egg (−₱18)</label>
+            <small class="form-text text-muted">Price must exceed the selected deductions. Raw ingredient stock stays separate from finished servings.</small>
+          </fieldset>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Ingredients for one order</label>
+            <p class="form-text mb-2">Optional reference list. Servings and raw stock are updated separately in Inventory.</p>
+            <div id="editRecipeRows"></div>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="addRecipeRow('editRecipeRows')">+ Add Ingredient</button>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea id="editDescription" class="form-control" placeholder="Brief description of the item"
+              rows="3"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Picture Upload</label>
+            <input type="file" id="editImage" class="form-control" accept="image/*">
+            <img id="imagePreview2" class="image-preview" alt="Preview">
+            <img id="currentImage" class="image-preview" style="display: none;" alt="Current">
+            <small class="form-text text-muted">Leave empty to keep current image</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" id="saveItemButton" class="btn-add-menu" onclick="saveItem()">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let currentItemId = null;
+  let originalRecipeHadRows = false;
+  let allItems = [];
+  let menuLoadError = null;
+  let currentFilter = 'All';
+  let CATEGORIES = [];
+  const refreshMenu = window.createDebouncedRefresh(function () {
+    loadCategories();
+    loadItems();
+  }, 150);
+
+  // Socket.IO for real-time updates
+  try {
+    const socket = window.getIdeaFlowSocket();
+    if (socket) {
+      socket.on('menu_update', function (data) {
+        refreshMenu();
+        if (data.event === 'create') {
+          showToast('✓ New menu item added!', 'success');
+        } else if (data.event === 'update') {
+          showToast('✓ Menu item updated!', 'success');
+        } else if (data.event === 'delete') {
+          showToast('✓ Menu item deleted!', 'success');
+        } else if (data.event === 'availability_toggle') {
+          showToast('✓ Item availability toggled!', 'success');
+        } else if (data.event === 'create_category') {
+          showToast('✓ New category added!', 'success');
+        }
+      });
+      socket.on('inventory_update', refreshMenu);
+      socket.on('connect', refreshMenu);
+    }
+  } catch (error) {
+    console.warn('Real-time menu updates are unavailable.', error);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    loadCategories();
+    loadItems();
+    setupImagePreviews();
+  });
+
+  function loadCategories() {
+    fetchJSON(`${window.managementBase}/menu/api/categories`)
+      .then(data => {
+        if (!data.success) throw new Error('Menu categories unavailable');
+        CATEGORIES = data.data;
+
+        // Re-render tabs
+        const container = document.getElementById('categoryTabs');
+        if (container) {
+          container.innerHTML = `<div class="category-tab ${currentFilter === 'All' ? 'active' : ''}" data-category="All">All Items</div>`;
+          CATEGORIES.forEach(cat => {
+            const tab = document.createElement('div');
+            tab.className = `category-tab ${currentFilter === cat ? 'active' : ''}`;
+            tab.textContent = cat;
+            tab.dataset.category = cat;
+            container.appendChild(tab);
+          });
+          setupEventListeners();
+        }
+
+        // Populate select dropdowns
+        const populateSelect = (selectId) => {
+          const select = document.getElementById(selectId);
+          if (select) {
+            const val = select.value; // save selection
+            select.innerHTML = '<option value="">Select category...</option>';
+            CATEGORIES.forEach(cat => {
+              const opt = document.createElement('option');
+              opt.value = cat;
+              opt.textContent = cat;
+              select.appendChild(opt);
+            });
+            select.value = val;
+          }
+        };
+
+        populateSelect('category');
+        populateSelect('editCategory');
+      })
+      .catch(err => showToast(err.status === 403 ? 'Menu access denied.' : 'Could not load menu categories.', 'error'));
+  }
+
+  function createCategory() {
+    const name = document.getElementById('categoryName').value.trim();
+    if (!name) {
+      showToast('Category name is required', 'error');
+      return;
+    }
+    
+    csrfFetch(`${window.managementBase}/menu/api/categories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name })
+    })
+    .then(parseMenuResponse)
+    .then(() => {
+      showToast('✓ Category created successfully!', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('addCategoryModal')).hide();
+      document.getElementById('addCategoryForm').reset();
+      refreshMenu();
+    })
+    .catch(err => showToast('✗ ' + err.message, 'error'));
+  }
+
+  function setupEventListeners() {
+    document.querySelectorAll('.category-tab').forEach(tab => {
+      tab.removeEventListener('click', tabClickHandler);
+      tab.addEventListener('click', tabClickHandler);
+    });
+
+    // Add search input listener
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.removeEventListener('input', searchInputHandler);
+      searchInput.addEventListener('input', searchInputHandler);
+    }
+  }
+
+  function searchInputHandler() {
+    filterAndRender();
+  }
+
+  function tabClickHandler() {
+    document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    currentFilter = this.dataset.category;
+    filterAndRender();
+  }
+
+  function setupImagePreviews() {
+    document.getElementById('image').addEventListener('change', function (e) {
+      const preview = document.getElementById('imagePreview1');
+      if (e.target.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          preview.src = event.target.result;
+          preview.classList.add('show');
+        };
+        reader.readAsDataURL(e.target.files[0]);
+      }
+    });
+
+    document.getElementById('editImage').addEventListener('change', function (e) {
+      const preview = document.getElementById('imagePreview2');
+      if (e.target.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          preview.src = event.target.result;
+          preview.classList.add('show');
+        };
+        reader.readAsDataURL(e.target.files[0]);
+      }
+    });
+
+    const variantImageInput = document.getElementById('variantImage');
+    if (variantImageInput) {
+      variantImageInput.addEventListener('change', function (e) {
+        const preview = document.getElementById('variantImagePreview');
+        if (e.target.files[0]) {
+          const reader = new FileReader();
+          reader.onload = function (event) {
+            preview.src = event.target.result;
+            preview.classList.add('show');
+          };
+          reader.readAsDataURL(e.target.files[0]);
+        } else {
+          preview.classList.remove('show');
+        }
+      });
+    }
+  }
+
+  function parseMenuResponse(response) {
+    return response.json().then(data => {
+      if (response.status === 401) {
+        throw new Error(data.error || 'Session expired. Please refresh the page and log in again.');
+      }
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || `Request failed (${response.status})`);
+      }
+      return data;
+    });
+  }
+
+  function loadItems() {
+    fetchJSON(`${window.managementBase}/menu/api/items/all`)
+      .then(data => {
+        if (!data.success) throw new Error('Menu items unavailable');
+        menuLoadError = null;
+        allItems = data.data;
+        filterAndRender();
+      })
+      .catch(err => {
+        console.error('Load items error:', err);
+        const message = err.status === 403 ? 'Menu access denied.' : 'Menu items could not be loaded. Please refresh the page.';
+        menuLoadError = message;
+        allItems = [];
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('menuGrid').textContent = message;
+        showToast(message, 'error');
+      });
+  }
+
+  function filterAndRender() {
+    if (menuLoadError) {
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('menuGrid').textContent = menuLoadError;
+      return;
+    }
+    const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+    const variantsBtn = document.getElementById('btnAddVariants');
+    if (variantsBtn) {
+      variantsBtn.style.display = currentFilter === 'Beverages' ? 'inline-flex' : 'none';
+    }
+    let filtered = currentFilter === 'All' ? allItems : allItems.filter(item => item.category === currentFilter);
+
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter(item => {
+        const nameMatch = item.name && item.name.toLowerCase().includes(searchQuery);
+        const categoryMatch = item.category && item.category.toLowerCase().includes(searchQuery);
+        const descriptionMatch = item.description && typeof item.description === 'string' && item.description.toLowerCase().includes(searchQuery);
+        return nameMatch || categoryMatch || descriptionMatch;
+      });
+    }
+
+    const grid = document.getElementById('menuGrid');
+    const emptyState = document.getElementById('emptyState');
+
+    if (filtered.length === 0) {
+      grid.innerHTML = '';
+      emptyState.style.display = 'block';
+      return;
+    }
+
+    emptyState.style.display = 'none';
+    grid.innerHTML = filtered.map(item => `
+    <div class="menu-card">
+      <div class="menu-card-image">
+        ${item.image_url ? `<img loading="lazy" decoding="async" src="${item.image_url}" alt="${item.name}">` : '<div class="menu-card-image-placeholder">🖼️</div>'}
+        <span class="menu-card-badge">${item.category}</span>
+      </div>
+      <div class="menu-card-body">
+        <h3 class="menu-card-name">${item.name}</h3>
+        <p class="menu-card-category">${item.category}</p>
+        ${item.description ? `<p style="font-size: 0.9rem; color: #666; margin-bottom: 0.5rem;">${item.description}</p>` : ''}
+        <div class="menu-card-price">₱${parseFloat(item.price).toFixed(2)}</div>
+        ${(item.can_remove_rice || item.can_remove_egg) ? `<small class="text-muted">Optional: ${[item.can_remove_rice ? 'no rice' : '', item.can_remove_egg ? 'no egg' : ''].filter(Boolean).join(', ')}</small>` : ''}
+        <div class="status-badge ${item.can_order ? 'status-available' : 'status-unavailable'}">
+          ${item.availability_message || 'Unavailable'}
+        </div>
+      </div>
+      <div class="menu-card-actions">
+        <button class="btn-icon btn-edit" onclick="editItem(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.price}, '${item.category}', '${item.image_url || ''}')">
+          <i class="bi bi-pencil-square"></i> Edit
+        </button>
+        <button class="btn-icon btn-toggle" onclick="toggleAvailability(${item.id})">
+          ${item.is_available ? '<i class="bi bi-lock"></i> Disable' : '<i class="bi bi-unlock"></i> Enable'}
+        </button>
+        <button class="btn-icon btn-delete" onclick="deleteItem(${item.id})">
+          <i class="bi bi-trash3"></i> Delete
+        </button>
+      </div>
+    </div>
+  `).join('');
+  }
+
+  function addRecipeRow(containerId, ingredient = {}) {
+    const row = document.createElement('div');
+    row.className = 'recipe-entry row g-2 align-items-end mb-2';
+    row.innerHTML = `<div class="col-12 col-sm-5"><label class="form-label mb-1">Ingredient name</label><input class="form-control recipe-name" type="text" maxlength="100" placeholder="e.g., Rice" required></div>
+      <div class="col-6 col-sm-3"><label class="form-label mb-1">Per meal</label><input class="form-control recipe-amount" type="number" min="0.01" max="999999" step="0.01" required></div>
+      <div class="col-6 col-sm-3"><label class="form-label mb-1">Unit</label><select class="form-select recipe-unit"><option value="pieces">pieces</option><option value="grams">grams</option><option value="klg">kilograms</option><option value="ml">mL</option><option value="liters">liters</option><option value="packs">packs</option><option value="trays">trays</option></select></div>
+      <div class="col-12 col-sm-1"><button type="button" class="btn btn-outline-danger btn-sm" aria-label="Remove ingredient" onclick="this.closest('.recipe-entry').remove()">×</button></div>`;
+    row.querySelector('.recipe-name').value = ingredient.name || '';
+    row.querySelector('.recipe-amount').value = ingredient.quantity_required ?? '';
+    row.querySelector('.recipe-unit').value = ingredient.unit || ingredient.ingredient_unit || 'pieces';
+    document.getElementById(containerId).appendChild(row);
+  }
+
+  function recipeRows(containerId) {
+    return [...document.querySelectorAll(`#${containerId} .recipe-entry`)].map(row => {
+      const name = row.querySelector('.recipe-name');
+      const amount = row.querySelector('.recipe-amount');
+      if (!name.reportValidity() || !amount.reportValidity()) throw new Error('Complete every ingredient name and amount.');
+      return {name: name.value.trim(), quantity: amount.value, unit: row.querySelector('.recipe-unit').value};
+    });
+  }
+
+  function createItem() {
+    const formData = new FormData();
+    formData.append('name', document.getElementById('itemName').value);
+    formData.append('category', document.getElementById('category').value);
+    formData.append('price', document.getElementById('price').value);
+    formData.append('description', document.getElementById('description').value);
+    formData.append('can_remove_rice', String(document.getElementById('canRemoveRice').checked));
+    formData.append('can_remove_egg', String(document.getElementById('canRemoveEgg').checked));
+
+    const imageFile = document.getElementById('image').files[0];
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
+    csrfFetch(`${window.managementBase}/menu/api/items`, {
+      method: 'POST',
+      body: formData,
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(parseMenuResponse)
+      .then(() => {
+        showToast(document.getElementById('category').value === 'Beverages'
+          ? '✓ Menu item created successfully!'
+          : '✓ Meal saved. Set its available servings in Inventory.', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
+        document.getElementById('addItemForm').reset();
+        document.getElementById('imagePreview1').classList.remove('show');
+        refreshMenu();
+      })
+      .catch(err => showToast('✗ ' + err.message, 'error'));
+  }
+
+  function createBeverageVariants() {
+    const baseName = document.getElementById('variantBaseName').value.trim();
+    const labelsRaw = document.getElementById('variantLabels').value.trim();
+    const pricesRaw = document.getElementById('variantPrices').value.trim();
+    const description = document.getElementById('variantDescription').value.trim();
+
+    const labels = labelsRaw.split(',').map(s => s.trim()).filter(Boolean);
+    const pricesStrArr = pricesRaw.split(',').map(s => s.trim()).filter(Boolean);
+    const prices = pricesStrArr.map(p => Number(p));
+
+    if (!baseName) return showToast('Base name is required', 'error');
+    if (!labels.length) return showToast('Variant labels are required', 'error');
+    if (!pricesStrArr.length) return showToast('Variant prices are required', 'error');
+    if (labels.length !== prices.length) return showToast('Labels count must match prices count', 'error');
+    if (prices.some(p => Number.isNaN(p) || p < 0)) return showToast('Prices must be valid numbers >= 0', 'error');
+
+    const formData = new FormData();
+    formData.append('base_name', baseName);
+    formData.append('variant_labels', labels.join(','));
+    formData.append('variant_prices', prices.join(','));
+    formData.append('description', description);
+
+    const imageFile = document.getElementById('variantImage').files[0];
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
+    csrfFetch(`${window.managementBase}/menu/api/items/variants`, {
+      method: 'POST',
+      body: formData,
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(parseMenuResponse)
+      .then(() => {
+        showToast('✓ Beverage variants created!', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('variantModal')).hide();
+        document.getElementById('variantForm').reset();
+        const preview = document.getElementById('variantImagePreview');
+        if (preview) preview.classList.remove('show');
+        refreshMenu();
+      })
+      .catch(err => showToast('✗ ' + err.message, 'error'));
+  }
+
+  function editItem(itemId, name, price, category, imageUrl) {
+    currentItemId = itemId;
+    document.getElementById('editItemName').value = name;
+    document.getElementById('editPrice').value = price;
+    document.getElementById('editCategory').value = category;
+
+    document.getElementById('saveItemButton').disabled = true;
+    originalRecipeHadRows = false;
+    document.getElementById('editRecipeRows').replaceChildren();
+    Promise.all([
+      fetch(`${window.managementBase}/menu/api/items/all`).then(parseMenuResponse),
+      fetch(`${window.managementBase}/inventory/api/recipes/${itemId}`).then(parseMenuResponse)
+    ]).then(([menu, recipe]) => {
+      if (currentItemId !== itemId) return;
+      const item = menu.data.find(i => i.id === itemId);
+      originalRecipeHadRows = recipe.data.length > 0;
+      document.getElementById('editDescription').value = item?.description || '';
+      document.getElementById('editCanRemoveRice').checked = !!item?.can_remove_rice;
+      document.getElementById('editCanRemoveEgg').checked = !!item?.can_remove_egg;
+      if (originalRecipeHadRows) recipe.data.forEach(ingredient => addRecipeRow('editRecipeRows', {name: ingredient.ingredient_name, ...ingredient}));
+      document.getElementById('saveItemButton').disabled = false;
+    }).catch(error => showToast('✗ Could not load this recipe: ' + error.message, 'error'));
+
+    const currentImg = document.getElementById('currentImage');
+    if (imageUrl) {
+      currentImg.src = imageUrl;
+      currentImg.style.display = 'block';
+    } else {
+      currentImg.style.display = 'none';
+    }
+
+    document.getElementById('imagePreview2').classList.remove('show');
+    document.getElementById('editImage').value = '';
+
+    new bootstrap.Modal(document.getElementById('editItemModal')).show();
+  }
+
+  async function saveItem() {
+    let ingredients;
+    try { ingredients = recipeRows('editRecipeRows'); }
+    catch (error) { return showToast('✗ ' + error.message, 'error'); }
+    if (!ingredients.length && originalRecipeHadRows) {
+      const confirmed = await showConfirmDialog({title: 'Remove this recipe?',
+        message: 'This removes the ingredient reference only. Available servings and raw stock will not change.',
+        confirmText: 'Remove recipe', confirmClass: 'btn-warning'});
+      if (!confirmed) return;
+    }
+    const formData = new FormData();
+    formData.append('name', document.getElementById('editItemName').value);
+    formData.append('category', document.getElementById('editCategory').value);
+    formData.append('price', document.getElementById('editPrice').value);
+    formData.append('description', document.getElementById('editDescription').value);
+    formData.append('can_remove_rice', String(document.getElementById('editCanRemoveRice').checked));
+    formData.append('can_remove_egg', String(document.getElementById('editCanRemoveEgg').checked));
+    if (ingredients.length || originalRecipeHadRows) {
+      formData.append('recipe_ingredients', JSON.stringify(ingredients));
+    }
+
+    const imageFile = document.getElementById('editImage').files[0];
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
+    csrfFetch(`${window.managementBase}/menu/api/items/${currentItemId}`, {
+      method: 'PATCH',
+      body: formData,
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(parseMenuResponse)
+      .then(() => {
+        showToast(ingredients.length ? '✓ Recipe saved. Check ingredient stock in Inventory.' : '✓ Menu item updated successfully!', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('editItemModal')).hide();
+        refreshMenu();
+      })
+      .catch(err => showToast('✗ ' + err.message, 'error'));
+  }
+
+  function toggleAvailability(itemId) {
+    csrfFetch(`${window.managementBase}/menu/api/items/${itemId}/availability`, {
+      method: 'PATCH',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(parseMenuResponse)
+      .then(data => {
+        showToast(`✓ Item ${data.is_available ? 'enabled' : 'disabled'} successfully!`, 'success');
+        refreshMenu();
+      })
+      .catch(err => {
+        console.error('Toggle error:', err);
+        showToast('✗ ' + err.message, 'error');
+      });
+  }
+
+  async function deleteItem(itemId) {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Menu Item',
+      message: 'Are you sure you want to delete this menu item? This action cannot be undone.',
+      confirmText: 'Delete',
+      confirmClass: 'btn-danger',
+      iconType: 'delete',
+      icon: '<i class="bi bi-trash3 fs-1 text-danger"></i>'
+    });
+    if (!confirmed) return;
+
+    csrfFetch(`${window.managementBase}/menu/api/items/${itemId}`, {
+      method: 'DELETE',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(parseMenuResponse)
+      .then(data => {
+        showToast('✓ ' + (data.message || 'Menu item deleted successfully!'), 'success');
+        refreshMenu();
+      })
+      .catch(err => {
+        console.error('Delete error:', err);
+        showToast('✗ ' + err.message, 'error');
+      });
+  }
+
+  function showToast(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 4000);
+  }
+</script>
+{% endblock %}

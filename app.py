@@ -1,0 +1,14 @@
+import os
+
+from app import create_app, socketio
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    # Werkzeug's debug server can corrupt WebSocket close frames locally.
+    debug_mode = os.environ.get("FLASK_DEBUG") == "1" and os.environ.get("FLASK_ENV") != "production"
+    socketio.run(app, host="0.0.0.0", port=5000, debug=debug_mode, allow_unsafe_werkzeug=True)
+
+
+#add lg kay kasabad sng git

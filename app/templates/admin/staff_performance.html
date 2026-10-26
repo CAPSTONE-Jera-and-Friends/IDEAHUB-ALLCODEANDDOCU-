@@ -1,0 +1,197 @@
+{% extends "layout.html" %}
+
+{% block title %}Staff Performance - IdeaFlow{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+  <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h3 class="mb-0">Staff Performance Leaderboard</h3>
+      <small id="performance-count" class="text-muted">0 records</small>
+    </div>
+    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#addLogModal">
+      + Log Performance
+    </button>
+  </div>
+
+  <!-- Desktop Table View -->
+  <div class="card d-none d-md-block">
+    <div class="card-header">
+      <h5 class="mb-0">Leaderboard</h5>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Staff</th>
+              <th>Shift Date</th>
+              <th>Customers Served</th>
+              <th>Score</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Card View -->
+  <div class="d-md-none" id="leaderboard-card-container">
+    <p class="text-center text-muted py-4">Loading...</p>
+  </div>
+</div>
+
+<!-- Add Log Modal -->
+<div class="modal fade" id="addLogModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Log Staff Performance</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Staff Member *</label>
+          <select id="userId" class="form-select" required>
+            <option value="">Select staff...</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Shift Date *</label>
+          <input type="date" id="shiftDate" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Customers Served *</label>
+          <input type="number" id="customersServed" class="form-control" value="0" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Admin Notes</label>
+          <textarea id="adminNote" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-warning" onclick="createLog()">Log</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  loadLogs();
+  loadStaff();
+});
+
+function loadStaff() {
+  fetch('/api/users').then(r => r.json()).then(data => {
+    if (data.success) {
+      const select = document.getElementById('userId');
+      select.innerHTML = '<option value="">Select staff...</option>';
+      data.data.forEach(user => {
+        select.innerHTML += `<option value="${user.id}">${user.username}</option>`;
+      });
+    }
+  });
+}
+
+function loadLogs() {
+  fetch('/admin/staff-performance/api/logs').then(r => r.json()).then(data => {
+    if (data.success) {
+      // Desktop table
+      const tbody = document.getElementById('leaderboard-body');
+      tbody.innerHTML = '';
+
+      // Mobile cards
+      const cardContainer = document.getElementById('leaderboard-card-container');
+      document.getElementById('performance-count').innerText = `${data.data.length} record(s)`;
+
+      if (!data.data.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No performance logs found.</td></tr>';
+        cardContainer.innerHTML = '<p class="text-center text-muted py-4">No performance logs found.</p>';
+        return;
+      }
+
+      let cardHtml = '<div class="d-flex flex-column gap-2">';
+
+      data.data.forEach((log, idx) => {
+        // Desktop row
+        tbody.innerHTML += `
+          <tr>
+            <td>${idx + 1}</td>
+            <td>${log.username}</td>
+            <td>${log.shift_date}</td>
+            <td>${log.customers_served}</td>
+            <td><strong>${log.score.toFixed(2)}</strong></td>
+            <td>${log.admin_note || '-'}</td>
+          </tr>
+        `;
+
+        // Mobile card
+        cardHtml += `
+          <div class="record-card">
+            <div class="record-card-header">
+              <div>
+                <div class="record-card-title">#${idx + 1} ${log.username}</div>
+                <div class="record-card-subtitle">${log.shift_date}</div>
+              </div>
+            </div>
+            <div class="record-card-body">
+              <div class="record-card-row">
+                <span class="record-card-label">Customers Served:</span>
+                <span class="record-card-value">${log.customers_served}</span>
+              </div>
+              <div class="record-card-row">
+                <span class="record-card-label">Notes:</span>
+                <span class="record-card-value">${log.admin_note || '-'}</span>
+              </div>
+            </div>
+            <div class="record-card-footer">
+              <span class="record-card-total">Score: ${log.score.toFixed(2)}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      cardHtml += '</div>';
+      cardContainer.innerHTML = cardHtml;
+    }
+  });
+}
+
+function createLog() {
+  const payload = {
+    user_id: document.getElementById('userId').value,
+    shift_date: document.getElementById('shiftDate').value,
+    customers_served: document.getElementById('customersServed').value,
+    admin_note: document.getElementById('adminNote').value,
+  };
+
+  csrfFetch('/admin/staff-performance/api/logs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      showToast('Performance logged', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('addLogModal')).hide();
+      document.getElementById('userId').value = '';
+      document.getElementById('shiftDate').value = '';
+      document.getElementById('customersServed').value = '0';
+      document.getElementById('adminNote').value = '';
+      loadLogs();
+    } else {
+      showToast('Error logging performance', 'error');
+    }
+  });
+}
+</script>
+{% endblock %}

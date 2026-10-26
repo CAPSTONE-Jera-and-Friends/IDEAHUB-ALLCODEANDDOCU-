@@ -1,0 +1,1294 @@
+{% extends "layout.html" %}
+
+{% block title %}Inventory Management - IdeaFlow{% endblock %}
+
+{% block content %}
+
+<style>
+  .inventory-container {
+    padding: 1.5rem 0;
+  }
+
+  .modern-card {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modern-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.04);
+  }
+
+  .modern-card .card-body {
+    padding: 1.5rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* Status badge styling */
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .status-ok {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+
+  .status-low {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  .status-warning {
+    background: var(--warning-soft);
+    color: var(--warning);
+  }
+
+  /* Stat dots */
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .dot-danger { background-color: var(--danger); }
+  .dot-warning { background-color: var(--warning); }
+  .dot-success { background-color: var(--success); }
+
+  .vertical-divider {
+    width: 1px;
+    height: 24px;
+    background-color: var(--border);
+  }
+
+  .progress-bar-custom {
+    height: 6px;
+    border-radius: 3px;
+    background-color: #f1f5f9;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  .progress-ok { background-color: var(--success); }
+  .progress-warning { background-color: var(--warning); }
+  .progress-low { background-color: var(--danger); }
+
+  .btn-add-inventory {
+    background: var(--brand);
+    color: #1e293b;
+    font-weight: 600;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .btn-add-inventory:hover {
+    background: var(--brand-dark);
+  }
+
+  .inventory-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+  }
+
+  .btn-icon {
+    flex: 1 1 auto;
+    background: white;
+    border: 1px solid var(--border);
+    padding: 0.45rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    transition: all 0.2s ease;
+  }
+
+  .btn-icon:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
+  }
+
+  .btn-delete-item:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: var(--danger);
+  }
+
+  /* Table styling */
+  .modern-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .modern-table th {
+    background: #faf7e8;
+    color: #4b5563;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1rem;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+  }
+
+  .modern-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: #1e293b;
+    vertical-align: middle;
+  }
+
+  .btn-secondary-modal {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid var(--border);
+    font-weight: 600;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+  }
+  
+  .btn-secondary-modal:hover {
+    background: #e2e8f0;
+  }
+
+  .btn-primary-modal {
+    background: var(--brand);
+    color: #1e293b;
+    border: none;
+    font-weight: 600;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+  }
+
+  .btn-primary-modal:hover {
+    background: var(--brand-dark);
+  }
+
+  .filter-chip {
+    border: 1px solid var(--border);
+    background: white;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    transition: all 0.15s ease;
+  }
+
+  .filter-chip.active {
+    background: var(--brand);
+    border-color: var(--brand-dark);
+    color: #1e293b;
+  }
+
+  .ingredient-search-wrap {
+    position: relative;
+  }
+
+  .dropdown-results {
+    position: absolute;
+    z-index: 1050;
+    left: 0;
+    right: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    display: none;
+  }
+
+  .dropdown-results.show {
+    display: block;
+  }
+
+  .dropdown-results .result-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+
+  .dropdown-results .result-item:hover {
+    background: #f8fafc;
+  }
+
+  .inventory-search-bar {
+    max-width: 420px;
+  }
+
+  .inventory-search-bar .form-control {
+    border-radius: 8px;
+    padding-left: 2.25rem;
+  }
+
+  .inventory-search-bar .search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+  }
+</style>
+
+<div class="container-fluid inventory-container">
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-3">
+    <div>
+      <h1 class="h3 fw-bold text-dark m-0">Inventory</h1>
+      <p class="text-muted m-0 mt-1" style="font-size: 0.9rem;">Add ingredients, update their stock, and check what is running low. Meals are shown below.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn-add-inventory" data-bs-toggle="modal" data-bs-target="#addItemModal">
+        <i class="bi bi-plus me-1"></i> Add Ingredient
+      </button>
+    </div>
+  </div>
+
+  <!-- METRICS BAR -->
+  <div class="d-flex align-items-center gap-4 mb-4 flex-wrap bg-white p-3 rounded-3 border shadow-sm">
+    <div class="d-flex align-items-center gap-2">
+      <span class="status-dot dot-danger"></span>
+      <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">Low Stock:</span>
+      <span class="fw-bold text-dark" id="lowStockCount">0</span>
+    </div>
+    <div class="vertical-divider"></div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="status-dot dot-warning"></span>
+      <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">No Stock:</span>
+      <span class="fw-bold text-dark" id="noStockCount">0</span>
+    </div>
+    <div class="vertical-divider"></div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="status-dot dot-success"></span>
+      <span class="text-secondary fw-semibold text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">Total Menu Items:</span>
+      <span class="fw-bold text-dark" id="totalMenuItemsCount">0</span>
+    </div>
+  </div>
+
+  <!-- GLOBAL SEARCH -->
+  <div class="mb-4 position-relative inventory-search-bar">
+    <i class="bi bi-search search-icon"></i>
+    <input type="text" id="inventorySearchInput" class="form-control shadow-sm" placeholder="Search ingredients or meals..." autocomplete="off">
+  </div>
+
+  <!-- DIRECT STOCK (primary monitoring) -->
+  <div class="mb-2">
+    <h2 class="h5 fw-bold text-dark mb-1">Ingredients &amp; Stock</h2>
+    <p class="text-muted mb-3" style="font-size: 0.9rem;">What you have on hand. Use Update stock when supplies arrive or a count needs correcting.</p>
+    <div class="d-flex flex-wrap gap-2 mb-3" id="directStockFilters">
+      <button type="button" class="filter-chip active" data-filter="all">All</button>
+      <button type="button" class="filter-chip" data-filter="low">Low Stock</button>
+      <button type="button" class="filter-chip" data-filter="warning">Warning</button>
+      <button type="button" class="filter-chip" data-filter="normal">Normal</button>
+      <button type="button" class="filter-chip" data-filter="out">Out of Stock</button>
+      <button type="button" class="filter-chip" data-filter="linked">Used in a recipe</button>
+      <button type="button" class="filter-chip" data-filter="unlinked">Not used in a recipe</button>
+    </div>
+  </div>
+  <div class="row g-4 mb-5" id="direct-stock-grid"></div>
+  <div class="empty-state mb-5" id="directStockEmpty" style="display: none;">
+    <div class="empty-icon">📭</div>
+    <h3>No raw ingredients yet</h3>
+    <p>Add your first raw ingredient to start monitoring stock</p>
+  </div>
+
+  <!-- MEAL SERVINGS -->
+  <div class="mb-2 pt-2 border-top">
+    <h2 class="h5 fw-bold text-dark mb-1">Meals &amp; Availability</h2>
+    <p class="text-muted mb-3" style="font-size: 0.9rem;">Enter your own serving estimate. Orders reduce servings; update raw ingredients separately.</p>
+    <button type="button" id="setupReviewFilter" class="filter-chip mb-3" aria-pressed="false" onclick="toggleSetupReview()">Needs setup review: <span id="setupReviewCount">0</span></button>
+  </div>
+  <div class="row g-4" id="recipe-inventory-grid"></div>
+  <div class="empty-state" id="recipeEmpty" style="display: none;">
+    <div class="empty-icon">🍽️</div>
+    <h3>No sellable menu items</h3>
+    <p>Menu meals will appear here with their available servings</p>
+  </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2 text-warning"></i>Add Ingredient</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">Add a supply you keep on hand, such as rice, cheese, or milk.</p>
+        <div class="mb-3">
+          <label class="form-label" for="ingredientName">Ingredient name</label>
+          <input type="text" id="ingredientName" class="form-control" placeholder="e.g. Rice, cheese, milk" maxlength="100" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="startQty">How much do you have now?</label>
+          <input type="number" id="startQty" class="form-control" value="0" min="0" max="999999" step="0.01" aria-describedby="startQtyHelp" required>
+          <div id="startQtyHelp" class="form-text">Enter 0 if none yet. You can use decimals, such as 1.5 kilograms.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="unit">How do you count it?</label>
+          <select id="unit" class="form-select">
+            <option value="pieces">pieces (pcs)</option>
+            <option value="klg">kilograms (kg)</option>
+            <option value="grams">grams (g)</option>
+            <option value="trays">trays</option>
+            <option value="packs">packs</option>
+            <option value="liters">liters (L)</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="threshold">Remind me to restock when this much is left</label>
+          <input type="number" id="threshold" class="form-control" value="10" min="0" max="999999" step="1" aria-describedby="thresholdHelp" required>
+          <div id="thresholdHelp" class="form-text">At this amount or less, the ingredient shows as running low. Enter 0 to turn off this reminder.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary-modal" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-primary-modal" onclick="createIngredient()">Add ingredient</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ingredients (Recipe) Manager Modal -->
+<div class="modal fade" id="ingredientsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-journal-text me-2 text-warning"></i>Ingredients for <span id="modalMealName" class="fw-bold"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <!-- Left: Current Recipe Ingredients -->
+          <div class="col-md-7 border-end">
+            <h6 class="fw-bold mb-3">Recipe & Current Stock</h6>
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+              <table class="table table-sm table-hover align-middle">
+                <thead>
+                  <tr style="background: #faf7e8;">
+                    <th style="font-size: 0.8rem; font-weight: 600; padding: 0.5rem;">Ingredient</th>
+                    <th style="font-size: 0.8rem; font-weight: 600; padding: 0.5rem;">Req/Meal</th>
+                    <th style="font-size: 0.8rem; font-weight: 600; padding: 0.5rem;">Stock</th>
+                    <th style="font-size: 0.8rem; font-weight: 600; padding: 0.5rem;" class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="ingredientsTableBody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- Right: Link New Ingredient to Recipe -->
+          <div class="col-md-5 ps-md-4 mt-3 mt-md-0">
+            <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle me-1 text-success"></i>Link Ingredient</h6>
+            <div class="mb-3 ingredient-search-wrap">
+              <label class="form-label">Ingredient</label>
+              <input type="text" id="ingredientSearchInput" class="form-control" placeholder="Search ingredients..." autocomplete="off">
+              <div id="ingredientSearchResults" class="dropdown-results"></div>
+              <input type="hidden" id="modalIngredientSelect" value="">
+              <input type="hidden" id="modalIngredientUnit" value="">
+              <div class="form-text" id="ingredientSearchHint">Type to search; click a result to select.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Quantity Required per Serving</label>
+              <input type="number" id="modalQtyRequired" class="form-control" value="1" step="0.01" min="0.01">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Recipe Unit</label>
+              <select id="modalRecipeUnit" class="form-select" onchange="updateConversionHelperText()">
+                <option value="pieces">pieces (pcs)</option>
+                <option value="klg">kilograms (klg)</option>
+                <option value="grams">grams (g)</option>
+                <option value="trays">trays</option>
+                <option value="packs">packs</option>
+                <option value="liters">liters (L)</option>
+                <option value="ml">milliliters (mL)</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Conversion Ratio</label>
+              <input type="number" id="modalConversionRatio" class="form-control" value="1.0000" step="0.0001" min="0.0001" oninput="updateConversionHelperText()">
+              <div class="form-text text-muted" id="conversionRatioHelper" style="font-size: 0.8rem; font-weight: 500;">
+                1 piece = 1.0000 pieces
+              </div>
+            </div>
+            <button class="btn btn-dark w-100" onclick="linkRecipeIngredient()">
+              Link to Recipe
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Stock (Adjustment) Modal -->
+<div class="modal fade" id="editStockModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-warning"></i>Adjust Stock for <span id="modalAdjustItemName" class="fw-bold"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Current Stock</label>
+          <input type="text" id="adjustCurrentQty" class="form-control bg-light" readonly>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Adjustment Mode</label>
+          <select id="adjustMode" class="form-select" onchange="toggleAdjustHelperText()">
+            <option value="add">Add (+)</option>
+            <option value="sub">Subtract (-)</option>
+            <option value="set">Set Exact Total (=)</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="adjustUnit">Unit measurements</label>
+          <select id="adjustUnit" class="form-select" onchange="updateAdjustQuantityStep()" required></select>
+        </div>
+        <div class="mb-3" id="adjustConversionField" hidden>
+          <label class="form-label" for="adjustConversionRatio" id="adjustConversionLabel"></label>
+          <input type="number" id="adjustConversionRatio" class="form-control" min="0.000001" max="999999" step="any">
+          <div class="form-text">Enter the amount in the ingredient's stored unit for one selected unit.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="adjustQtyInput">Quantity</label>
+          <input type="number" id="adjustQtyInput" class="form-control" min="0" max="999999" step="1" required>
+          <div class="form-text text-muted" id="adjustHelperText">Add this quantity to current stock.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Reason</label>
+          <select id="reason" class="form-select" onchange="syncAdjustReason()" required>
+            <option value="Restock">Restock</option>
+            <option value="Damaged">Damaged</option>
+            <option value="Expired">Expired</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary-modal" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-primary-modal" id="saveStockAdjustment" onclick="submitStockAdjustment()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Logs Modal -->
+<div class="modal fade" id="logsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-journal-text me-2 text-warning"></i>Inventory Logs: <span id="modalLogItemName" class="fw-bold"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr style="background: #faf7e8;">
+                <th style="font-weight: 600; color: #4b5563; padding: 0.75rem;">Date</th>
+                <th style="font-weight: 600; color: #4b5563; padding: 0.75rem;">Change</th>
+                <th style="font-weight: 600; color: #4b5563; padding: 0.75rem;">Reason & Detail</th>
+                <th style="font-weight: 600; color: #4b5563; padding: 0.75rem;">Changed By</th>
+              </tr>
+            </thead>
+            <tbody id="logsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include 'inventory_controls.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentItemId = null;
+let currentMenuItemId = null;
+let currentMealId = null;
+let currentStoredUnit = 'pieces';
+let directStockItems = [];
+let recipeItems = [];
+let setupReviewOnly = false;
+let directStockFilter = 'all';
+let inventorySearchQuery = '';
+let ingredientSearchTimer = null;
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function escapeJsString(text) {
+  return String(text).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+// Socket.IO for real-time updates
+const refreshInventory = window.createDebouncedRefresh(loadInventory, 150);
+try {
+  const socket = window.getIdeaFlowSocket();
+  if (socket) socket.on('inventory_update', refreshInventory);
+  if (socket) socket.on('connect', refreshInventory);
+  if (socket) socket.on('menu_update', refreshInventory);
+} catch (error) {
+  console.warn('Real-time inventory updates are unavailable.', error);
+}
+window.addEventListener('inventory-changed', refreshInventory);
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadInventory();
+  document.querySelectorAll('#directStockFilters .filter-chip').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#directStockFilters .filter-chip').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      directStockFilter = this.dataset.filter;
+      renderDirectStock();
+    });
+  });
+  initIngredientSearch();
+  const searchInput = document.getElementById('inventorySearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      inventorySearchQuery = this.value;
+      renderDirectStock();
+      renderRecipeInventory();
+    });
+  }
+});
+
+function matchesInventorySearch(name) {
+  const q = inventorySearchQuery.trim().toLowerCase();
+  if (!q) return true;
+  return String(name || '').toLowerCase().includes(q);
+}
+
+function updateInventorySummary() {
+  const summary = inventorySummary || {};
+  let lowStockCount = summary.low_stock;
+  let noStockCount = summary.no_stock;
+  let totalMenuItems = summary.total_menu_items;
+
+  if (lowStockCount == null) {
+    lowStockCount = directStockItems.filter(item => item.is_low).length;
+  }
+  if (noStockCount == null) {
+    noStockCount = directStockItems.filter(item => item.is_out_of_stock).length;
+  }
+  if (totalMenuItems == null) {
+    totalMenuItems = recipeItems.length;
+  }
+
+  document.getElementById('lowStockCount').textContent = lowStockCount;
+  document.getElementById('noStockCount').textContent = noStockCount;
+  document.getElementById('totalMenuItemsCount').textContent = totalMenuItems;
+}
+
+let inventorySummary = null;
+let inventoryLoadError = null;
+
+function loadInventory() {
+  fetchJSON(`${window.managementBase}/inventory/api/dashboard-items`)
+    .then(data => {
+      if (!data.success) throw new Error('Inventory could not be loaded.');
+      inventoryLoadError = null;
+      directStockItems = data.direct_stock || [];
+      recipeItems = data.data || [];
+      InventoryUI.setMeals(recipeItems);
+      document.getElementById('setupReviewCount').textContent = recipeItems.filter(item => item.setup_review).length;
+      inventorySummary = data.summary || null;
+      updateInventorySummary();
+      renderDirectStock();
+      renderRecipeInventory();
+      InventoryUI.refreshDailySummaries(renderRecipeInventory);
+    })
+    .catch(error => {
+      const message = error.status === 403 ? 'Inventory access denied.' : 'Inventory could not be loaded. Please refresh the page.';
+      inventoryLoadError = message;
+      directStockItems = [];
+      recipeItems = [];
+      inventorySummary = null;
+      if (window.InventoryUI) InventoryUI.setMeals([]);
+      for (const id of ['setupReviewCount', 'lowStockCount', 'noStockCount', 'totalMenuItemsCount']) {
+        document.getElementById(id).textContent = '—';
+      }
+      document.getElementById('directStockEmpty').style.display = 'none';
+      document.getElementById('recipeEmpty').style.display = 'none';
+      document.getElementById('direct-stock-grid').textContent = message;
+      document.getElementById('recipe-inventory-grid').textContent = message;
+      showToast(message, 'error');
+    });
+}
+
+function filterDirectStockItems(items) {
+  return items.filter(item => {
+    if (!matchesInventorySearch(item.name)) return false;
+    switch (directStockFilter) {
+      case 'low': return item.is_low;
+      case 'warning': return item.is_warning;
+      case 'normal': return !item.is_low && !item.is_warning && !item.is_out_of_stock;
+      case 'out': return item.is_out_of_stock;
+      case 'linked': return item.is_linked;
+      case 'unlinked': return !item.is_linked;
+      default: return true;
+    }
+  });
+}
+
+function filterRecipeItems(items) {
+  return items.filter(item => matchesInventorySearch(item.name) && (!setupReviewOnly || item.setup_review));
+}
+
+function toggleSetupReview() {
+  setupReviewOnly = !setupReviewOnly;
+  const button = document.getElementById('setupReviewFilter');
+  button.classList.toggle('active', setupReviewOnly);
+  button.setAttribute('aria-pressed', String(setupReviewOnly));
+  renderRecipeInventory();
+}
+
+function renderDirectStockCard(item) {
+  let barClass = 'progress-ok';
+  let progressPercent = item.low_stock_threshold > 0
+    ? Math.min((item.stock_qty / (item.low_stock_threshold * 2)) * 100, 100)
+    : (item.stock_qty > 0 ? 100 : 0);
+  let statusHtml = '';
+
+  if (item.is_out_of_stock) {
+    statusHtml = '<span class="status-badge status-low">🔴 Out of stock</span>';
+    barClass = 'progress-low';
+  } else if (item.is_low) {
+    statusHtml = '<span class="status-badge status-low">🔴 Low Stock</span>';
+    barClass = 'progress-low';
+  } else if (item.is_warning) {
+    statusHtml = '<span class="status-badge status-warning">🟡 Warning</span>';
+    barClass = 'progress-warning';
+  } else {
+    statusHtml = '<span class="status-badge status-ok">✅ OK</span>';
+  }
+
+  const linkedLabel = item.recipe_count > 0
+    ? `Used in ${item.recipe_count} meal${item.recipe_count === 1 ? '' : 's'}`
+    : 'Not used in a meal recipe';
+  const linkedTitle = item.linked_meal_names && item.linked_meal_names.length
+    ? escapeHtml(item.linked_meal_names.join(', '))
+    : '';
+
+  const invId = item.inventory_item_id || 'null';
+  const nameEsc = escapeJsString(item.name);
+
+  return `
+    <div class="col-md-6 col-lg-4">
+      <div class="modern-card">
+        <div class="card-body">
+          <div>
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <h5 class="fw-bold text-dark m-0" style="font-size: 1.05rem; line-height: 1.3;">${escapeHtml(item.name)}</h5>
+              ${statusHtml}
+            </div>
+            <span class="badge bg-light text-dark border mt-2 py-1 px-2" style="font-size: 0.7rem; font-weight: 500;">🥬 Raw ingredient</span>
+            <p class="text-secondary mb-0 mt-2" style="font-size: 0.75rem;" title="${linkedTitle}">${linkedLabel}</p>
+            <div class="mt-2">
+              <div class="d-flex justify-content-between mb-1" style="font-size: 0.8rem;">
+                <span class="text-secondary">Stock: <strong class="text-dark">${Number(item.stock_qty).toLocaleString(undefined, {maximumFractionDigits: 2})} ${escapeHtml(formatUnitSingular(item.stock_qty, item.unit))}</strong></span>
+                <span class="text-secondary">Restock reminder: ${item.low_stock_threshold > 0 ? item.low_stock_threshold + ' ' + escapeHtml(formatUnitSingular(item.low_stock_threshold, item.unit)) : 'Off'}</span>
+              </div>
+              <div class="progress-bar-custom">
+                <div class="progress-fill ${barClass}" style="width: ${progressPercent}%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="inventory-actions">
+            <button class="btn-icon" onclick="openAdjustModal(${invId}, ${item.stock_qty}, '${nameEsc}', ${item.menu_item_id}, '${escapeHtml(escapeJsString(item.unit || 'pieces'))}')">
+              <i class="bi bi-plus-slash-minus"></i> Update stock
+            </button>
+            <button class="btn-icon" onclick="viewLogsOrInit(${invId}, '${nameEsc}', ${item.menu_item_id}, '${escapeHtml(escapeJsString(item.unit || 'pieces'))}')">
+              <i class="bi bi-journal-text"></i> History
+            </button>
+            <button class="btn-icon btn-delete-item" onclick="deleteRawIngredient(${item.menu_item_id}, '${nameEsc}', ${item.recipe_count})" title="Delete ingredient">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDirectStock() {
+  const grid = document.getElementById('direct-stock-grid');
+  const empty = document.getElementById('directStockEmpty');
+  if (inventoryLoadError) {
+    empty.style.display = 'none';
+    grid.textContent = inventoryLoadError;
+    return;
+  }
+  const filtered = filterDirectStockItems(directStockItems);
+
+  updateInventorySummary();
+
+  if (directStockItems.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  if (filtered.length === 0) {
+    const msg = inventorySearchQuery.trim()
+      ? 'No ingredients match your search or filter.'
+      : 'No ingredients match this filter.';
+    grid.innerHTML = `<div class="col-12"><p class="text-muted">${msg}</p></div>`;
+    return;
+  }
+  grid.innerHTML = filtered.map(renderDirectStockCard).join('');
+}
+
+function renderRecipeInventory() {
+  const grid = document.getElementById('recipe-inventory-grid');
+  if (inventoryLoadError) {
+    document.getElementById('recipeEmpty').style.display = 'none';
+    grid.textContent = inventoryLoadError;
+    return;
+  }
+  const filtered = filterRecipeItems(recipeItems);
+  document.getElementById('recipeEmpty').style.display = recipeItems.length ? 'none' : 'block';
+  grid.innerHTML = filtered.map(item => {
+    return `<div class="col-md-6 col-lg-4"><div class="modern-card h-100"><div class="card-body">
+      <h5 class="fw-bold text-dark mb-1">${escapeHtml(item.name)}</h5>
+      <div class="inventory-count">${item.available_quantity == null ? 'Available while enabled' : item.available_quantity + ' ' + item.display_unit}</div>
+      ${InventoryUI.status(item)}
+      ${InventoryUI.mealActions(item)}
+    </div></div></div>`;
+  }).join('');
+  if (recipeItems.length && !filtered.length) grid.innerHTML = '<p class="text-muted">No meals match your search.</p>';
+}
+
+function viewLogsOrInit(itemId, itemName, menuItemId, unit) {
+  if (!itemId || itemId === 'null') {
+    showToast('Save stock once to initialize logs for this ingredient', 'error');
+    openAdjustModal(null, 0, itemName, menuItemId, unit);
+    return;
+  }
+  viewLogs(itemId, itemName);
+}
+
+// CREATE RAW INGREDIENT
+function createIngredient() {
+  const nameInput = document.getElementById('ingredientName');
+  const stockInput = document.getElementById('startQty');
+  const thresholdInput = document.getElementById('threshold');
+  if (![nameInput, stockInput, thresholdInput].every(input => input.reportValidity())) return;
+  const name = nameInput.value.trim();
+  const startQty = Number(stockInput.value);
+  const unit = document.getElementById('unit').value;
+  const threshold = Number(thresholdInput.value);
+
+  if (!name) {
+    showToast('Please enter an ingredient name', 'error');
+    return;
+  }
+
+  csrfFetch(`${window.managementBase}/inventory/api/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ingredient_name: name,
+      stock_qty: startQty,
+      unit: unit,
+      low_stock_threshold: threshold
+    })
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      showToast('Ingredient added.', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
+      
+      // Clear values
+      nameInput.value = '';
+      stockInput.value = '0';
+      thresholdInput.value = '10';
+      
+      refreshInventory();
+    } else {
+      showToast('✗ Error: ' + (data.error || 'Failed to create ingredient'), 'error');
+    }
+  }).catch(() => showToast('Could not add the ingredient. Please try again.', 'error'));
+}
+
+// INGREDIENTS MODAL FUNCTIONS
+function openIngredientsModal(mealId, mealName) {
+  currentMealId = mealId;
+  document.getElementById('modalMealName').textContent = mealName;
+
+  loadRecipeIngredients(mealId);
+  resetIngredientSearch();
+  fetchIngredientSearch('');
+
+  new bootstrap.Modal(document.getElementById('ingredientsModal')).show();
+}
+
+function initIngredientSearch() {
+  const input = document.getElementById('ingredientSearchInput');
+  const results = document.getElementById('ingredientSearchResults');
+  if (!input) return;
+
+  input.addEventListener('input', function() {
+    clearTimeout(ingredientSearchTimer);
+    const term = input.value.trim();
+    ingredientSearchTimer = setTimeout(() => fetchIngredientSearch(term), 250);
+  });
+
+  input.addEventListener('focus', function() {
+    if (results.children.length) results.classList.add('show');
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.ingredient-search-wrap')) {
+      results.classList.remove('show');
+    }
+  });
+}
+
+function resetIngredientSearch() {
+  const input = document.getElementById('ingredientSearchInput');
+  const hidden = document.getElementById('modalIngredientSelect');
+  const results = document.getElementById('ingredientSearchResults');
+  if (input) input.value = '';
+  if (hidden) hidden.value = '';
+  if (results) {
+    results.innerHTML = '';
+    results.classList.remove('show');
+  }
+}
+
+function fetchIngredientSearch(term) {
+  const results = document.getElementById('ingredientSearchResults');
+  const q = term ? `?q=${encodeURIComponent(term)}` : '';
+  fetch(`${window.managementBase}/inventory/api/ingredients${q}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) throw new Error('Failed');
+      renderIngredientSearchResults(data.data || []);
+    })
+    .catch(() => {
+      results.innerHTML = '<div class="result-item text-danger">Could not load ingredients</div>';
+      results.classList.add('show');
+      showToast('Failed to load ingredients for linking', 'error');
+    });
+}
+
+function formatUnitSingular(qty, unit) {
+  const val = Math.abs(parseFloat(qty));
+  if (unit === "klg") return "kg";
+  if (val === 1.0) {
+    if (unit === "pieces") return "piece";
+    if (unit === "packs") return "pack";
+    if (unit === "trays") return "tray";
+    if (unit === "liters") return "liter";
+  }
+  return unit;
+}
+
+function updateConversionHelperText() {
+  const recipeUnit = document.getElementById('modalRecipeUnit').value;
+  const ratioVal = parseFloat(document.getElementById('modalConversionRatio').value) || 1.0;
+  const ingredientUnit = document.getElementById('modalIngredientUnit').value || 'pieces';
+  
+  const recipeUnitStr = formatUnitSingular(1.0, recipeUnit);
+  const ingredientUnitStr = formatUnitSingular(ratioVal, ingredientUnit);
+  
+  document.getElementById('conversionRatioHelper').innerHTML = 
+    `1 ${recipeUnitStr} = <strong class="text-success">${ratioVal.toFixed(4)}</strong> ${ingredientUnitStr}`;
+}
+
+function renderIngredientSearchResults(items) {
+  const results = document.getElementById('ingredientSearchResults');
+  if (!items.length) {
+    results.innerHTML = '<div class="result-item text-muted">No ingredients found</div>';
+    results.classList.add('show');
+    return;
+  }
+  results.innerHTML = items.map(i => {
+    const sub = i.recipe_count > 0 ? ` · used in ${i.recipe_count} recipe(s)` : '';
+    const stockVal = parseFloat(i.stock_qty);
+    const stockUnitStr = formatUnitSingular(stockVal, i.unit);
+    const label = `${i.name}${sub} · ${stockVal.toFixed(2)} ${stockUnitStr}`;
+    return `<div class="result-item" data-id="${i.id}" data-unit="${escapeHtml(i.unit)}" data-label="${escapeHtml(label)}"><strong>${escapeHtml(i.name)}</strong><span class="text-muted">${sub} · ${stockVal.toFixed(2)} ${escapeHtml(stockUnitStr)}</span></div>`;
+  }).join('');
+  results.classList.add('show');
+  results.querySelectorAll('.result-item[data-id]').forEach(el => {
+    el.addEventListener('click', function() {
+      document.getElementById('modalIngredientSelect').value = this.dataset.id;
+      document.getElementById('modalIngredientUnit').value = this.dataset.unit;
+      document.getElementById('ingredientSearchInput').value = this.querySelector('strong').textContent;
+      results.classList.remove('show');
+      
+      // Auto-select the inventory unit for the recipe by default
+      document.getElementById('modalRecipeUnit').value = this.dataset.unit;
+      document.getElementById('modalConversionRatio').value = '1.0000';
+      updateConversionHelperText();
+    });
+  });
+}
+
+function loadRecipeIngredients(mealId) {
+  const tbody = document.getElementById('ingredientsTableBody');
+  tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Loading recipe ingredients...</td></tr>';
+  
+  fetch(`${window.managementBase}/inventory/api/recipes/${mealId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        if (data.data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No ingredients linked yet. Link one on the right!</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = data.data.map(m => {
+          let stockClass = 'text-dark';
+          if (m.stock_qty < 5) stockClass = 'text-danger fw-bold';
+
+          const invId = m.inventory_item_id || 'null';
+          const ingName = escapeJsString(m.ingredient_name);
+
+          const reqQty = parseFloat(m.quantity_required);
+          const ratio = parseFloat(m.conversion_ratio || 1.0);
+          const recipeUnit = m.unit || m.ingredient_unit || 'pieces';
+          const ingredientUnit = m.ingredient_unit || 'pieces';
+
+          let reqDisplay = "";
+          if (m.unit && m.unit !== ingredientUnit) {
+            const equiv = reqQty * ratio;
+            const recUnitStr = formatUnitSingular(reqQty, recipeUnit);
+            const ingUnitStr = formatUnitSingular(equiv, ingredientUnit);
+            reqDisplay = `${reqQty} ${recUnitStr} (equiv. ${equiv.toFixed(2)} ${ingUnitStr})`;
+          } else {
+            const recUnitStr = formatUnitSingular(reqQty, recipeUnit);
+            reqDisplay = `${reqQty} ${recUnitStr}`;
+          }
+
+          const stockQty = parseFloat(m.stock_qty);
+          const stockUnitStr = formatUnitSingular(stockQty, ingredientUnit);
+          const stockDisplay = `${stockQty.toFixed(2)} ${stockUnitStr}`;
+
+          return `
+            <tr>
+              <td class="fw-semibold text-secondary">${escapeHtml(m.ingredient_name)}</td>
+              <td>${reqDisplay}</td>
+              <td class="${stockClass}">${stockDisplay}</td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-dark p-1 me-1" title="Adjust Stock" onclick="openAdjustModal(${invId}, ${stockQty}, '${ingName}', ${m.ingredient_item_id}, '${escapeHtml(escapeJsString(ingredientUnit))}')">
+                  <i class="bi bi-plus-slash-minus"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-dark p-1 me-1" title="Logs" onclick="viewLogsOrInit(${invId}, '${ingName}', ${m.ingredient_item_id}, '${escapeHtml(escapeJsString(ingredientUnit))}')">
+                  <i class="bi bi-journal-text"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger p-1" title="Remove" onclick="removeRecipeIngredient(${m.id}, '${ingName}')">
+                  <i class="bi bi-x"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    });
+}
+
+function linkRecipeIngredient() {
+  const ingredientId = document.getElementById('modalIngredientSelect').value;
+  const qty = parseFloat(document.getElementById('modalQtyRequired').value);
+  const unit = document.getElementById('modalRecipeUnit').value;
+  const ratio = parseFloat(document.getElementById('modalConversionRatio').value);
+  
+  if (!ingredientId) {
+    showToast('Please select an ingredient', 'error');
+    return;
+  }
+  if (isNaN(qty) || qty <= 0) {
+    showToast('Quantity must be greater than zero', 'error');
+    return;
+  }
+  if (isNaN(ratio) || ratio <= 0) {
+    showToast('Conversion ratio must be greater than zero', 'error');
+    return;
+  }
+
+  csrfFetch(`${window.managementBase}/inventory/api/recipes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      menu_item_id: currentMealId,
+      ingredient_item_id: ingredientId,
+      quantity_required: qty,
+      unit: unit,
+      conversion_ratio: ratio
+    })
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      showToast(data.message || '✓ Ingredient linked successfully!', 'success');
+      loadRecipeIngredients(currentMealId);
+      resetIngredientSearch();
+      document.getElementById('modalQtyRequired').value = '1';
+      document.getElementById('modalConversionRatio').value = '1.0000';
+      refreshInventory();
+    } else {
+      showToast('✗ ' + (data.message || data.error || 'Failed to link ingredient'), 'error');
+    }
+  });
+}
+
+async function removeRecipeIngredient(recipeId, ingredientName) {
+  // Confirm prompt to prevent accidental modifications (Suggestion 7)
+  const confirmed = await showConfirmDialog({
+    title: 'Remove Recipe Ingredient',
+    message: `Are you sure you want to remove "${ingredientName}" from the recipe? This action cannot be undone.`,
+    confirmText: 'Remove',
+    confirmClass: 'btn-danger',
+    iconType: 'delete',
+    icon: '<i class="bi bi-trash3 fs-1 text-danger"></i>'
+  });
+
+  if (!confirmed) return;
+
+  csrfFetch(`${window.managementBase}/inventory/api/recipes/${recipeId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' }
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      showToast('✓ Ingredient removed from recipe', 'success');
+      loadRecipeIngredients(currentMealId);
+      refreshInventory();
+    } else {
+      showToast('✗ Error removing ingredient', 'error');
+    }
+  });
+}
+
+// STOCK ADJUSTMENT MODAL
+function openAdjustModal(itemId, currentQty, itemName, menuItemId, unit = 'pieces') {
+  currentItemId = itemId && itemId !== 'null' ? itemId : null;
+  currentMenuItemId = menuItemId || null;
+  const storedUnit = unit === 'kg' ? 'klg' : unit;
+  currentStoredUnit = storedUnit;
+  const unitSelect = document.getElementById('adjustUnit');
+  unitSelect.replaceChildren(...InventoryUI.stockUnits.map(([value, label]) => new Option(label, value)));
+  if (!InventoryUI.stockUnits.some(([value]) => value === storedUnit)) unitSelect.add(new Option(storedUnit, storedUnit));
+  unitSelect.value = storedUnit;
+
+  document.getElementById('modalAdjustItemName').textContent = itemName;
+  document.getElementById('adjustCurrentQty').value = `${currentQty} ${formatUnitSingular(currentQty, storedUnit)}`;
+  document.getElementById('adjustQtyInput').value = '';
+  updateAdjustQuantityStep();
+  document.getElementById('adjustMode').value = 'add';
+  document.getElementById('reason').value = 'Restock';
+  toggleAdjustHelperText();
+
+  // Show the modal
+  const adjustModal = new bootstrap.Modal(document.getElementById('editStockModal'));
+  adjustModal.show();
+}
+
+function updateAdjustQuantityStep() {
+  const selected = document.getElementById('adjustUnit').value;
+  const needsRatio = InventoryUI.needsUnitConversion(selected, currentStoredUnit);
+  const ratioInput = document.getElementById('adjustConversionRatio');
+  document.getElementById('adjustQtyInput').value = '';
+  document.getElementById('adjustQtyInput').step = ['pieces', 'packs', 'trays'].includes(selected) ? '1' : '0.01';
+  document.getElementById('adjustConversionField').hidden = !needsRatio;
+  document.getElementById('adjustConversionLabel').textContent = `How many ${InventoryUI.unitSymbol(currentStoredUnit)} in 1 ${InventoryUI.shortUnit(selected)}?`;
+  ratioInput.required = needsRatio;
+  ratioInput.value = '';
+}
+
+function syncAdjustReason() {
+  document.getElementById('adjustMode').value = document.getElementById('reason').value === 'Restock' ? 'add' : 'sub';
+  toggleAdjustHelperText();
+}
+
+function toggleAdjustHelperText() {
+  const mode = document.getElementById('adjustMode').value;
+  const helper = document.getElementById('adjustHelperText');
+  if (mode === 'add') {
+    helper.textContent = 'Add this quantity to current stock.';
+  } else if (mode === 'sub') {
+    helper.textContent = 'Subtract this quantity from current stock.';
+  } else {
+    helper.textContent = 'Set stock to this exact total quantity.';
+  }
+}
+
+function submitStockAdjustment() {
+  const mode = document.getElementById('adjustMode').value;
+  const quantityInput = document.getElementById('adjustQtyInput');
+  if (!quantityInput.reportValidity()) return;
+  const ratioInput = document.getElementById('adjustConversionRatio');
+  if (ratioInput.required && !ratioInput.reportValidity()) return;
+  const adjustVal = quantityInput.value;
+  const reason = document.getElementById('reason').value;
+
+  if (!currentItemId && !currentMenuItemId) {
+    showToast('Cannot update stock: item not found', 'error');
+    return;
+  }
+
+  const stockUrl = currentItemId
+    ? `${window.managementBase}/inventory/api/items/${currentItemId}/stock`
+    : `${window.managementBase}/inventory/api/menu-items/${currentMenuItemId}/stock`;
+
+  const saveButton = document.getElementById('saveStockAdjustment');
+  saveButton.disabled = true;
+  csrfFetch(stockUrl, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+    body: JSON.stringify({
+      quantity: adjustVal,
+      unit: document.getElementById('adjustUnit').value,
+      conversion_ratio: ratioInput.required ? ratioInput.value : null,
+      mode: mode,
+      reason: reason
+    })
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      showToast('✓ Stock updated successfully!', 'success');
+      if (data.data && data.data.inventory_item_id) {
+        currentItemId = data.data.inventory_item_id;
+      }
+      bootstrap.Modal.getInstance(document.getElementById('editStockModal')).hide();
+      refreshInventory();
+      
+      // If ingredients modal is open, refresh it as well!
+      if (document.getElementById('ingredientsModal').classList.contains('show')) {
+        loadRecipeIngredients(currentMealId);
+      }
+    } else {
+      showToast('✗ Error: ' + (data.error || 'Failed to update stock'), 'error');
+    }
+  }).catch(error => showToast(error.message || 'Failed to update stock', 'error'))
+    .finally(() => { saveButton.disabled = false; });
+}
+
+// DELETE RAW INGREDIENT
+async function deleteRawIngredient(menuItemId, ingredientName, recipeCount) {
+  if (recipeCount > 0) {
+    showToast(`Cannot delete: "${ingredientName}" is used in ${recipeCount} recipe(s). Remove recipe links first.`, 'error');
+    return;
+  }
+
+  const confirmed = await showConfirmDialog({
+    title: 'Delete Raw Ingredient',
+    message: `Are you sure you want to delete "${ingredientName}"? This removes it from inventory monitoring and cannot be undone.`,
+    confirmText: 'Delete',
+    confirmClass: 'btn-danger',
+    iconType: 'delete',
+    icon: '<i class="bi bi-trash3 fs-1 text-danger"></i>'
+  });
+
+  if (!confirmed) return;
+
+  csrfFetch(`${window.managementBase}/inventory/api/ingredients/${menuItemId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' }
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      showToast('✓ Raw ingredient deleted', 'success');
+      refreshInventory();
+    } else {
+      showToast('✗ Error: ' + (data.error || 'Failed to delete ingredient'), 'error');
+    }
+  });
+}
+
+// DELETE RECIPE
+async function deleteRecipe(mealId, mealName) {
+  const confirmed = await showConfirmDialog({
+    title: 'Delete Recipe',
+    message: `Are you sure you want to delete all ingredient recipe mappings for "${mealName}"? This will return it to a Direct Stock item.`,
+    confirmText: 'Delete Recipe',
+    confirmClass: 'btn-danger',
+    iconType: 'delete',
+    icon: '<i class="bi bi-trash3 fs-1 text-danger"></i>'
+  });
+
+  if (!confirmed) return;
+
+  // Fetch recipe items and delete them
+  fetch(`${window.managementBase}/inventory/api/recipes/${mealId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        const promises = data.data.map(m => 
+          csrfFetch(`${window.managementBase}/inventory/api/recipes/${m.id}`, { method: 'DELETE' })
+        );
+        Promise.all(promises).then(() => {
+          showToast('✓ Recipe mappings removed successfully', 'success');
+          refreshInventory();
+        });
+      }
+    });
+}
+
+// VIEW LOGS
+function viewLogs(itemId, itemName) {
+  document.getElementById('modalLogItemName').textContent = itemName;
+  const tbody = document.getElementById('logsBody');
+  tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Loading logs...</td></tr>';
+  
+  new bootstrap.Modal(document.getElementById('logsModal')).show();
+
+  fetch(`${window.managementBase}/inventory/api/items/${itemId}/logs`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        if (data.data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No logs found for this item.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.data.map(log => `
+          <tr>
+            <td>${log.created_at}</td>
+            <td><strong style="color: ${log.change_qty > 0 ? '#2e7d32' : '#c62828'}">
+              ${log.change_qty > 0 ? '+' : ''}${log.change_qty}
+            </strong></td>
+            <td>${log.reason}</td>
+            <td>${log.changed_by}</td>
+          </tr>
+        `).join('');
+      }
+    });
+}
+</script>
+{% endblock %}

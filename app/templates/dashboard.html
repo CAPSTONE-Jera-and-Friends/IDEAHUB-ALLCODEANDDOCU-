@@ -1,0 +1,1084 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ 'Food Orders' if food_only_view else 'Dashboard' }}{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-3 dashboard-header-row">
+
+        <div>
+            <h3 class="mb-0">{{ 'Active Food Orders' if food_only_view else 'Active Customer Sessions' }}</h3>
+            <small id="session-count" class="text-muted">{{ '0 orders' if food_only_view else '0 customers' }}</small>
+        </div>
+
+        {% if boardroom_view %}<a class="btn btn-warning" href="/lounge-booking">Boardroom walk-in or advance booking</a>{% endif %}
+        {% if food_only_view %}<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#checkinModal">+ New Food Order</button>{% endif %}
+        {% if not food_only_view %}<button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#cancelledCheckinsModal" onclick="loadCancelledCheckins(1)">Cancelled Time Ins</button>{% endif %}
+
+        <input 
+            type="text" 
+            id="searchInput" 
+            class="form-control dashboard-search-input"
+            placeholder="Search customer..."
+            oninput="loadSessions()"
+        >
+
+    </div>
+
+    {% if not food_only_view %}<div class="row mb-3" id="space-availability-cards">
+      <div class="col-12 col-md-6 mb-2">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="mb-1">Regular Lounge Seats</h6>
+                <small class="text-muted" id="regular-summary">Loading...</small>
+              </div>
+              <span class="badge text-bg-success" id="regular-left">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 mb-2">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="mb-1">Premium Lounge Seats</h6>
+                <small class="text-muted" id="premium-summary">Loading...</small>
+              </div>
+              <span class="badge text-bg-warning text-dark" id="premium-left">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div id="sessions-cards" class="sessions-cards d-md-none" aria-live="polite">
+      <p class="text-center text-muted py-4 mb-0">Loading...</p>
+    </div>
+
+    <div class="card shadow-sm d-none d-md-block">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead style="background:#f7f3c7;">
+            <tr>
+              {% if food_only_view %}
+              <th>Customer</th>
+              <th>Location</th>
+              <th>Food Total</th>
+              <th class="text-end">Actions</th>
+              {% else %}
+              <th>Customer</th>
+              <th class="d-none d-md-table-cell">School</th>
+              <th class="d-none d-md-table-cell">Course</th>
+              <th class="d-none d-md-table-cell">Purpose</th>
+              <th>Space</th>
+              <th>Time In</th>
+              <th class="d-none d-md-table-cell">Billable time</th>
+              <th class="d-none d-md-table-cell">Current Bill</th>
+              <th class="text-end">Actions</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody id="sessions-container">
+            <tr><td colspan="{{ 4 if food_only_view else 9 }}" class="text-center text-muted py-4">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+</div>
+
+{% if not food_only_view %}
+<div class="modal fade" id="cancelCheckinModal" tabindex="-1" aria-labelledby="cancelCheckinTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <form class="modal-content" id="cancelCheckinForm">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cancelCheckinTitle">Cancel mistaken Time In</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="cancelCheckinDetails" class="mb-2"></p>
+        <p class="text-muted small">Only an unused Time In can be cancelled. Its seat will become available; the entry stays in cancellation history. No payment is recorded.</p>
+        <label for="cancelCheckinReason" class="form-label">Reason</label>
+        <textarea id="cancelCheckinReason" class="form-control" rows="2" maxlength="500" required></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Time In</button>
+        <button type="submit" class="btn btn-danger" id="confirmCancelCheckin">Cancel Time In</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="cancelledCheckinsModal" tabindex="-1" aria-labelledby="cancelledCheckinsTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cancelledCheckinsTitle">Cancelled Time Ins</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body table-responsive">
+        <table class="table table-sm align-middle">
+          <thead><tr><th>Customer / Space</th><th>Time In / Cancelled</th><th>Staff / Reason</th><th class="text-end">Uncollected time</th></tr></thead>
+          <tbody id="cancelledCheckinsRows"><tr><td colspan="4">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <button type="button" class="btn btn-outline-secondary" id="cancelHistoryPrev" onclick="loadCancelledCheckins(cancelHistoryPage - 1)">Previous</button>
+        <span id="cancelHistoryPage" aria-live="polite"></span>
+        <button type="button" class="btn btn-outline-secondary" id="cancelHistoryNext" onclick="loadCancelledCheckins(cancelHistoryPage + 1)">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="timeHistoryModal" tabindex="-1" aria-labelledby="timeHistoryTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="timeHistoryTitle">Time bill history</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="timeHistoryBody" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- RECEIPT MODAL -->
+<div class="modal fade" id="receiptModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Order Summary</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body" id="receipt-body"></div>
+
+      <div class="modal-footer flex-column align-items-stretch gap-2">
+        <div id="payment-method-section" class="w-100" style="display:none;">
+          <label class="form-label fw-semibold mb-2">Payment Method</label>
+          <div class="d-flex flex-wrap gap-2 w-100" role="group" aria-label="Payment method">
+            <input type="radio" class="btn-check" name="paymentMethod" id="paymentCash" value="cash" checked>
+            <label class="btn btn-outline-success flex-fill" for="paymentCash"><i class="bi bi-cash-stack me-1"></i> Cash</label>
+            <input type="radio" class="btn-check" name="paymentMethod" id="paymentGcash" value="gcash">
+            <label class="btn btn-outline-primary flex-fill" for="paymentGcash"><i class="bi bi-phone me-1"></i> GCash</label>
+            <input type="radio" class="btn-check" name="paymentMethod" id="paymentBdo" value="bdo">
+            <label class="btn btn-outline-danger flex-fill" for="paymentBdo"><i class="bi bi-bank me-1"></i> BDO</label>
+            <input type="radio" class="btn-check" name="paymentMethod" id="paymentBpi" value="bpi">
+            <label class="btn btn-outline-warning text-dark flex-fill" for="paymentBpi"><i class="bi bi-bank2 me-1"></i> BPI</label>
+            <input type="radio" class="btn-check" name="paymentMethod" id="paymentQueenbank" value="queenbank">
+            <label class="btn btn-outline-warning text-dark flex-fill" for="paymentQueenbank"><i class="bi bi-bank2 me-1"></i> QueenBank</label>
+          </div>
+          <!-- Cash Payment Detail Box -->
+          <div id="cash-payment-details" class="mt-3 p-3 bg-light rounded border border-success-subtle" style="display: block;">
+            <div class="mb-2">
+              <label for="cashAmountGiven" class="form-label fw-semibold small text-success">Amount Given (₱)</label>
+              <input type="number" step="0.01" min="0" class="form-control border-success" id="cashAmountGiven" placeholder="Enter amount given">
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="small fw-semibold text-muted">Change:</span>
+              <span class="fw-bold text-success fs-5" id="cashChangeDisplay">₱0.00</span>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between w-100">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button class="btn btn-success" id="confirmCheckoutBtn">Checkout</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% if not boardroom_view %}
+<!-- CHECK-IN MODAL -->
+<div class="modal fade" id="checkinModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">{{ 'New Food Order' if food_only_view else 'New Customer Check-in' }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <label for="customerName" class="form-label">Customer name</label>
+        <input type="text" id="customerName" class="form-control mb-2" placeholder="Customer Name" maxlength="100" required>
+        {% if food_only_view %}
+        <label for="spaceType" class="form-label mb-1">Location</label>
+        <select id="spaceType" class="form-select" required>
+            <option value="">Select location...</option>
+            {% for space in food_locations %}
+            <option value="{{ space.name }}">{{ space.name }}</option>
+            {% endfor %}
+        </select>
+        <small class="text-muted">Food orders have no lounge timer or seat charge.</small>
+        {% else %}
+        <input type="text" id="school" class="form-control mb-2" placeholder="School">
+        <input type="text" id="course" class="form-control mb-2" placeholder="Course">
+        <small class="text-muted d-block mb-2">One check-in per person.</small>
+
+        {% if selected_space %}
+        <label class="form-label mb-1">Space</label>
+        <div class="form-control bg-light" aria-label="Selected space">{{ selected_space.name }}</div>
+        <input type="hidden" id="spaceType" value="{{ selected_space.id }}">
+        {% else %}
+        <label for="spaceType" class="form-label mb-1">Space</label>
+        <select id="spaceType" class="form-select" required>
+            <option value="">Select space...</option>
+            {% for space in space_types %}
+            <option value="{{ space.id }}">{{ space.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        {% endif %}
+
+        <div id="checkoutCorrectionGroup" class="mt-3 d-none">
+          <label for="checkoutCorrection" class="form-label mb-1">Correct an approved voided checkout (optional)</label>
+          <select id="checkoutCorrection" class="form-select">
+            <option value="">New customer visit</option>
+          </select>
+          <small class="text-muted">Select the old checkout to carry its food charge and any retained payment into this new visit.</small>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="checkinCustomerBtn" onclick="checkinCustomer()">{{ 'Start Food Order' if food_only_view else 'Check In' }}</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% if not food_only_view %}
+<!-- FLOATING ADD BUTTON -->
+<button id="floatingAddBtn"
+    class="btn btn-success"
+    data-bs-toggle="modal"
+    data-bs-target="#checkinModal">
+    +
+</button>
+{% endif %}
+{% endif %}
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+
+const foodOnlyView = {{ food_only_view|tojson }};
+const sessionsById = new Map();
+let cancelSessionId = null;
+let cancelHistoryPage = 1;
+
+async function setSessionTimePaused(sessionId, pause, button) {
+    const customer = sessionsById.get(sessionId);
+    if (!customer) return;
+    const action = pause ? "Pause" : "Resume";
+    const confirmed = await showConfirmDialog({
+        title: `${action} time bill`,
+        message: `${action} the time bill for ${customer.customer_name}?`,
+        confirmText: "Yes",
+        cancelText: "No"
+    });
+    if (!confirmed) return;
+    try {
+        const result = await runButtonAction(button, {label: `${action}...`}, key => fetchJSON(
+            `/api/sessions/${sessionId}/${pause ? "pause" : "resume"}`, {
+                method: "POST", headers: {"Idempotency-Key": key}
+            }
+        ));
+        showToast(result.message, "success");
+        loadSessions();
+    } catch (error) {
+        showToast(error.message || `Could not ${action.toLowerCase()} the time bill.`, "error");
+        if (error.status === 409) loadSessions();
+    }
+}
+
+async function showTimeHistory(sessionId) {
+    const body = document.getElementById("timeHistoryBody");
+    body.textContent = "Loading...";
+    const historyModal = bootstrap.Modal.getOrCreateInstance(document.getElementById("timeHistoryModal"));
+    const cancellations = document.getElementById("cancelledCheckinsModal");
+    if (cancellations.classList.contains("show")) {
+        cancellations.addEventListener("hidden.bs.modal", () => historyModal.show(), {once: true});
+        bootstrap.Modal.getInstance(cancellations).hide();
+    } else {
+        historyModal.show();
+    }
+    try {
+        const history = await fetchJSON(`/api/sessions/${sessionId}/time-history`);
+        document.getElementById("timeHistoryTitle").textContent = `${history.customer_name} — time bill history`;
+        body.innerHTML = history.events.length ? history.events.map(event => `
+            <div class="border-bottom py-2">
+                <strong>${escapeHtml(event.action.replaceAll("_", " "))}</strong> · ${escapeHtml(event.at)}<br>
+                <small>${escapeHtml(event.actor)} (${escapeHtml(event.role)})</small><br>
+                <small>Billable time ${formatTime(event.billable_seconds_before)} → ${formatTime(event.billable_seconds_after)};
+                time bill ₱${event.time_bill_before.toFixed(2)} → ₱${event.time_bill_after.toFixed(2)}</small>
+            </div>`).join("") : "No time bill changes for this visit.";
+    } catch (error) {
+        body.textContent = error.message || "Could not load time bill history.";
+    }
+}
+
+function openCancelCheckin(sessionId) {
+    const customer = sessionsById.get(sessionId);
+    if (!customer) return;
+    cancelSessionId = sessionId;
+    document.getElementById("cancelCheckinDetails").textContent = `${customer.customer_name} — ${customer.space_type}`;
+    document.getElementById("cancelCheckinReason").value = "";
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("cancelCheckinModal")).show();
+}
+
+document.getElementById("cancelCheckinForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const reason = document.getElementById("cancelCheckinReason").value.trim();
+    if (!reason || !cancelSessionId) return;
+    const button = document.getElementById("confirmCancelCheckin");
+    try {
+        const result = await runButtonAction(button, {label: "Cancelling..."}, key => fetchJSON(
+            `/api/sessions/${cancelSessionId}/cancel`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json", "Idempotency-Key": key},
+                body: JSON.stringify({reason})
+            }
+        ));
+        bootstrap.Modal.getInstance(document.getElementById("cancelCheckinModal")).hide();
+        showToast(result.message, "success");
+        loadSessions();
+        loadSpaceAvailability();
+    } catch (error) {
+        showToast(error.message || "Could not cancel this Time In.", "error");
+        if (error.status === 409) { loadSessions(); loadSpaceAvailability(); }
+    }
+});
+
+async function loadCancelledCheckins(page) {
+    if (page < 1) return;
+    const body = document.getElementById("cancelledCheckinsRows");
+    try {
+        const result = await fetchJSON(`/api/sessions/cancellations?page=${page}`);
+        cancelHistoryPage = result.page;
+        body.innerHTML = result.data.length ? result.data.map(row => `
+            <tr>
+              <td>${escapeHtml(row.customer_name)}<br><small>${escapeHtml(row.space_name)}</small></td>
+              <td>${escapeHtml(row.time_in)}<br><small>Cancelled ${escapeHtml(row.cancelled_at)}</small></td>
+              <td>${escapeHtml(row.actor || "Unknown")}<br><small>${escapeHtml(row.reason || "")}</small>
+              ${row.has_time_pause ? `<br><button type="button" class="btn btn-link btn-sm p-0" onclick="showTimeHistory(${row.session_id})" aria-label="Time bill history for ${escapeHtml(row.customer_name)}">Time history</button>` : ''}</td>
+              <td class="text-end">₱${row.uncollected_time_charge.toFixed(2)}</td>
+            </tr>`).join("") : '<tr><td colspan="4" class="text-center">No cancelled Time Ins.</td></tr>';
+        document.getElementById("cancelHistoryPage").textContent = `Page ${page} of ${Math.max(1, result.pages)}`;
+        document.getElementById("cancelHistoryPrev").disabled = page <= 1;
+        document.getElementById("cancelHistoryNext").disabled = page >= result.pages;
+    } catch (error) {
+        body.innerHTML = '<tr><td colspan="4" class="text-danger">Could not load cancellation history.</td></tr>';
+    }
+}
+
+document.getElementById("checkinModal")?.addEventListener("show.bs.modal", async () => {
+    const group = document.getElementById("checkoutCorrectionGroup");
+    const select = document.getElementById("checkoutCorrection");
+    select.replaceChildren(new Option("New customer visit", ""));
+    group.classList.add("d-none");
+    try {
+        const response = await fetch("/api/checkout-corrections", { credentials: "include" });
+        if (!response.ok) return;
+        const corrections = await response.json();
+        corrections.forEach(correction => {
+            const option = new Option(
+                `${correction.customer_name} — from ${correction.original_space}; food ₱${correction.food_bill.toFixed(2)}${correction.amount > 0 ? `; credit ₱${correction.amount.toFixed(2)} ${correction.payment_method}` : ''}`,
+                correction.request_id
+            );
+            option.dataset.customerName = correction.customer_name;
+            select.add(option);
+        });
+        group.classList.toggle("d-none", !corrections.length);
+    } catch (_) { /* New check-in still works without a correction. */ }
+});
+
+document.getElementById("checkinModal")?.addEventListener("hide.bs.modal", event => {
+    if (event.target.contains(document.activeElement)) document.activeElement.blur();
+});
+
+document.getElementById("checkoutCorrection")?.addEventListener("change", event => {
+    const name = document.getElementById("customerName");
+    const selected = event.target.selectedOptions[0];
+    name.readOnly = Boolean(event.target.value);
+    if (event.target.value) name.value = selected.dataset.customerName;
+});
+
+document.getElementById("receiptModal").addEventListener("hidden.bs.modal", function () {
+  document.getElementById("payment-method-section").style.display = "none";
+});
+
+let currentFilter = "all";
+
+// FILTER
+function setFilter(spaceType, btn) {
+    currentFilter = spaceType;
+
+    document.querySelectorAll(".space-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    loadSessions();
+}
+
+// Set filter from URL query
+(function initFilterFromQuery() {
+    const selected = new URLSearchParams(window.location.search).get("space");
+    if (selected) {
+        currentFilter = selected;
+    }
+})();
+
+
+// FORMAT TIME
+function formatTime(seconds) {
+    let hrs = Math.floor(seconds / 3600);
+    let mins = Math.floor((seconds % 3600) / 60);
+    let secs = seconds % 60;
+
+    return `${hrs.toString().padStart(2, '0')}:` +
+           `${mins.toString().padStart(2, '0')}:` +
+           `${secs.toString().padStart(2, '0')}`;
+}
+
+
+// CHECK-IN
+async function checkinCustomer() {
+
+    let name = document.getElementById("customerName").value.trim();
+    let spaceType = document.getElementById("spaceType").value;
+
+    if (!name) {
+        showToast("Customer name is required.", "error");
+        return;
+    }
+    if (!spaceType) {
+        showToast(foodOnlyView ? "Select a location." : "Select a space.", "error");
+        return;
+    }
+
+    const button = document.getElementById("checkinCustomerBtn");
+    try {
+        const data = await runButtonAction(button, {
+            label: foodOnlyView ? "Starting..." : "Checking in...",
+            slowLabel: foodOnlyView ? "Still starting..." : "Still checking in..."
+        }, requestKey => fetchJSON(foodOnlyView ? "/api/food-orders" : "/api/checkin", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Idempotency-Key": requestKey
+            },
+            body: JSON.stringify(foodOnlyView ? {
+                customer_name: name,
+                location: spaceType,
+                void_request_id: document.getElementById("checkoutCorrection").value || null
+            } : {
+                customer_name: name,
+                school: document.getElementById("school").value,
+                course: document.getElementById("course").value,
+                number_of_people: 1,
+                space_type_id: parseInt(spaceType, 10),
+                void_request_id: document.getElementById("checkoutCorrection").value || null
+            })
+        }));
+        if (!data) return;
+        if (data.error) {
+            showToast(data.error, "error");
+            return;
+        }
+
+        let modal = bootstrap.Modal.getInstance(document.getElementById('checkinModal'));
+        modal.hide();
+
+        document.getElementById("customerName").value = "";
+        document.getElementById("customerName").readOnly = false;
+        document.getElementById("checkoutCorrection").value = "";
+        if (foodOnlyView) {
+            document.getElementById("spaceType").value = "";
+        } else {
+            document.getElementById("school").value = "";
+            document.getElementById("course").value = "";
+        }
+
+        showToast(foodOnlyView ? "Food order started." : "Customer checked in successfully!", "success");
+        loadSessions();
+        if (!foodOnlyView) loadSpaceAvailability();
+    } catch (err) {
+        if (err.data && err.data.duplicate) {
+            showToast("This request is already being processed. The list will refresh.", "info");
+            loadSessions();
+        } else {
+            showToast(err.message || "Failed to start. Please try again.", "error");
+        }
+    }
+}
+
+function loadSpaceAvailability() {
+    if (foodOnlyView) return;
+    fetch("/api/space-availability", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const regular = data.find(x => x.space_name === "Regular Lounge");
+        const premium = data.find(x => x.space_name === "Premium Lounge");
+
+        if (regular) {
+          const left = regular.seats_left ?? 0;
+          document.getElementById("regular-left").textContent = `${left} left`;
+          document.getElementById("regular-summary").textContent = `${regular.occupied}/${regular.capacity} occupied`;
+          document.getElementById("regular-left").className = `badge ${left <= 5 ? "text-bg-danger" : "text-bg-success"}`;
+        }
+        if (premium) {
+          const left = premium.seats_left ?? 0;
+          document.getElementById("premium-left").textContent = `${left} left`;
+          document.getElementById("premium-summary").textContent = `${premium.occupied}/${premium.capacity} occupied`;
+          document.getElementById("premium-left").className = `badge ${left <= 5 ? "text-bg-danger" : "text-bg-warning text-dark"}`;
+        }
+      })
+      .catch(() => {});
+}
+
+
+// NAVIGATION
+function goToOrder(sessionId) {
+    window.location.href = `/order/${sessionId}`;
+}
+
+
+// VOID ITEM
+async function voidItem(itemId, sessionId) {
+    const confirmed = await showConfirmDialog({
+        title: "Remove Order Item",
+        message: "Are you sure you want to remove this item from the order?",
+        confirmText: "Remove Item",
+        confirmClass: "btn-danger",
+        iconType: "delete",
+        icon: '<i class="bi bi-trash3 fs-1 text-danger"></i>'
+    });
+    if (!confirmed) return;
+
+    csrfFetch(`/api/void-item/${itemId}`, {
+        method: "DELETE"
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            showToast(data.error, "error");
+            return;
+        }
+        showToast("Item removed successfully.", "success");
+        setTimeout(() => viewOrder(sessionId), 200);
+    })
+    .catch(err => {
+        showToast("Failed to remove item. Please try again.", "error");
+    });
+}
+
+
+// VIEW ORDER
+function viewOrder(sessionId) {
+
+    fetch(`/api/session-orders/${sessionId}?include_done=1`, { credentials: "include" })
+    .then(res => res.json())
+    .then(orderData => {
+
+        fetch(`/api/preview-checkout/${sessionId}`, { credentials: "include" })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                showToast(data.error, "error");
+                return;
+            }
+            const isFoodOnly = data.service_mode === "food_only";
+            const canCheckout = !isFoodOnly || data.food_bill > 0;
+
+            let itemsHTML = "";
+
+            orderData.orders.forEach(item => {
+                const canVoid = item.order_status !== "done";
+                itemsHTML += `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            ${escapeHtml(item.item_name)} x${item.quantity}
+                            <br>
+                            <small>₱${item.total.toFixed(2)}</small>
+                        </div>
+                        ${canVoid ? `
+                            <button class="btn btn-sm btn-danger"
+                                onclick="voidItem(${item.id}, ${sessionId})">
+                                Void
+                            </button>
+                        ` : ``}
+                    </div>
+                `;
+            });
+
+            if (!itemsHTML) itemsHTML = "<p>No new orders</p>";
+            if (data.carried_food_bill > 0) {
+                itemsHTML = `<p>Food carried from the voided checkout: ₱${data.carried_food_bill.toFixed(2)} (stock already recorded)</p>` + itemsHTML;
+            }
+
+            document.getElementById("receipt-body").innerHTML = `
+                <div style="text-align:center;">
+                    <h4>IdeaFlow</h4>
+                    <hr>
+                </div>
+
+                <p><strong>Customer:</strong> ${escapeHtml(data.customer_name)}</p>
+                ${isFoodOnly
+                    ? `<p><strong>Location:</strong> ${escapeHtml(data.space_type)} · Food only</p>`
+                    : `<p><strong>Billable time:</strong> ${formatTime(Math.floor(data.minutes_used * 60))}${data.paused ? ' · Paused' : ''}</p>`}
+
+                <hr>
+                <h6>Orders:</h6>
+                ${itemsHTML}
+                <hr>
+
+                ${isFoodOnly ? "" : `<p><strong>Time Bill:</strong> ₱${data.time_bill.toFixed(2)}</p>`}
+                <p><strong>Food Bill:</strong> ₱${data.food_bill.toFixed(2)}</p>
+                ${canCheckout ? "" : '<p class="text-warning">Add food before checkout.</p>'}
+
+                <div class="mb-2">
+                    <label class="form-label" for="discountType">PWD / Senior discount</label>
+                    <select id="discountType" class="form-select mb-2">
+                      <option value="">No discount</option><option value="pwd">PWD — 20%</option>
+                      <option value="senior">Senior Citizen — 20%</option>
+                    </select>
+                    ${orderData.orders.length ? `
+                    <label class="form-label" for="discountItem">Choose one meal/item</label>
+                    <select id="discountItem" class="form-select">
+                      <option value="">Select an item</option>
+                      ${orderData.orders.map(item => `<option value="${item.id}">${escapeHtml(item.item_name)} — one × ₱${item.price.toFixed(2)}</option>`).join('')}
+                    </select>
+                    <small class="text-muted">Only one unit of the selected item gets 20% off, even if the quantity is more than one.</small>
+                    ` : isFoodOnly ? '' : '<small class="text-muted">With no food order, 20% is taken off the time bill.</small>'}
+                  </div>
+                <p id="discount-row" class="text-success" style="display:none"><strong>Discount:</strong> −₱<span id="discount-amount">0.00</span></p>
+
+                <hr>
+                <h5>Total: ₱<span id="checkout-total">${data.total_bill.toFixed(2)}</span></h5>
+                ${data.credit_balance > 0 ? `<p class="text-success mb-1">Customer credit: ₱${data.credit_balance.toFixed(2)} (${escapeHtml(data.credit_payment_method)})</p>
+                <p class="fw-semibold mb-1">Still to pay: ₱<span id="checkout-due">${data.shortfall.toFixed(2)}</span></p>
+                <p id="credit-refund-note" class="text-warning small mb-1" style="display:${data.overpayment > 0 ? 'block' : 'none'}">Refund unused credit: ₱<span id="credit-refund-amount">${data.overpayment.toFixed(2)}</span></p>` : ''}
+                <p class="text-muted small mb-0" id="selected-payment-hint">Select payment method below before checkout.</p>
+            `;
+
+            document.getElementById("payment-method-section").style.display = canCheckout ? "block" : "none";
+            document.getElementById("confirmCheckoutBtn").disabled = !canCheckout;
+            document.getElementById("paymentCash").checked = true;
+            document.getElementById("paymentGcash").checked = false;
+            document.getElementById("paymentBdo").checked = false;
+            document.getElementById("paymentBpi").checked = false;
+            document.getElementById("paymentQueenbank").checked = false;
+            if (data.credit_balance > 0 && data.credit_payment_method) {
+                const creditMethod = document.querySelector(`input[name="paymentMethod"][value="${data.credit_payment_method}"]`);
+                if (creditMethod) creditMethod.checked = true;
+            }
+            document.querySelectorAll('input[name="paymentMethod"]').forEach(input => {
+                input.disabled = data.credit_balance > 0 && input.value !== data.credit_payment_method;
+            });
+
+            let totalBill = data.total_bill;
+            const creditBalance = data.credit_balance || 0;
+            let due = Math.max(0, Math.round((totalBill - creditBalance) * 100) / 100);
+            document.getElementById("cashAmountGiven").value = "";
+            document.getElementById("cashChangeDisplay").textContent = "₱0.00";
+
+            const cashInput = document.getElementById("cashAmountGiven");
+            const changeDisplay = document.getElementById("cashChangeDisplay");
+
+            function updateDiscount() {
+                const type = document.getElementById('discountType')?.value || '';
+                const itemId = Number(document.getElementById('discountItem')?.value || 0);
+                const item = orderData.orders.find(row => row.id === itemId);
+                const base = orderData.orders.length ? item?.price : data.time_bill;
+                const discount = type && base != null ? Math.round((base * 0.20 + Number.EPSILON) * 100) / 100 : 0;
+                totalBill = Math.round((data.total_bill - discount) * 100) / 100;
+                due = Math.max(0, Math.round((totalBill - creditBalance) * 100) / 100);
+                document.getElementById('discount-amount').textContent = discount.toFixed(2);
+                document.getElementById('discount-row').style.display = discount ? 'block' : 'none';
+                document.getElementById('checkout-total').textContent = totalBill.toFixed(2);
+                if (creditBalance > 0) {
+                    document.getElementById('checkout-due').textContent = due.toFixed(2);
+                    const refund = Math.max(0, Math.round((creditBalance - totalBill) * 100) / 100);
+                    document.getElementById('credit-refund-amount').textContent = refund.toFixed(2);
+                    document.getElementById('credit-refund-note').style.display = refund > 0 ? 'block' : 'none';
+                }
+                cashInput.dispatchEvent(new Event('input'));
+            }
+            if (document.getElementById('discountType')) {
+                document.getElementById('discountType').onchange = updateDiscount;
+                if (document.getElementById('discountItem')) document.getElementById('discountItem').onchange = updateDiscount;
+            }
+
+            cashInput.oninput = function () {
+                const given = parseFloat(cashInput.value);
+                if (isNaN(given) || given < due) {
+                    changeDisplay.textContent = "₱0.00";
+                    changeDisplay.classList.remove("text-success");
+                    changeDisplay.classList.add("text-danger");
+                } else {
+                    const change = given - due;
+                    changeDisplay.textContent = "₱" + change.toFixed(2);
+                    changeDisplay.classList.remove("text-danger");
+                    changeDisplay.classList.add("text-success");
+                }
+            };
+
+            function updatePaymentHint() {
+                const selected = document.querySelector('input[name="paymentMethod"]:checked');
+                const hint = document.getElementById("selected-payment-hint");
+                if (!hint || !selected) return;
+                const labels = { cash: "Cash", gcash: "GCash", bdo: "BDO", bpi: "BPI", queenbank: "QueenBank" };
+                hint.textContent = "Payment selected: " + (labels[selected.value] || selected.value);
+
+                const cashDetails = document.getElementById("cash-payment-details");
+                if (selected.value === "cash") {
+                    cashDetails.style.display = "block";
+                } else {
+                    cashDetails.style.display = "none";
+                    cashInput.value = "";
+                    changeDisplay.textContent = "₱0.00";
+                }
+            }
+
+            document.getElementById("paymentCash").onchange = updatePaymentHint;
+            document.getElementById("paymentGcash").onchange = updatePaymentHint;
+            document.getElementById("paymentBdo").onchange = updatePaymentHint;
+            document.getElementById("paymentBpi").onchange = updatePaymentHint;
+            document.getElementById("paymentQueenbank").onchange = updatePaymentHint;
+            updatePaymentHint();
+
+            let modal = new bootstrap.Modal(document.getElementById('receiptModal'));
+            modal.show();
+
+            document.getElementById("confirmCheckoutBtn").onclick = async function () {
+                const discountType = document.getElementById('discountType')?.value || '';
+                const discountItemId = document.getElementById('discountItem')?.value || '';
+                if (discountType && orderData.orders.length && !discountItemId) {
+                    showToast('Choose one meal/item for the discount.', 'error');
+                    return;
+                }
+                const selected = document.querySelector('input[name="paymentMethod"]:checked');
+                const paymentMethod = selected ? selected.value : "cash";
+                const labels = { cash: "Cash", gcash: "GCash", bdo: "BDO", bpi: "BPI", queenbank: "QueenBank" };
+                const paymentLabel = labels[paymentMethod] || paymentMethod;
+
+                let amountTendered = null;
+                if (paymentMethod === "cash") {
+                    const cashVal = cashInput.value.trim();
+                    if (!cashVal && due > 0) {
+                        showToast("Amount tendered is required for cash payments.", "error");
+                        return;
+                    }
+                    const given = cashVal ? parseFloat(cashVal) : 0;
+                    if (isNaN(given) || given < due) {
+                        showToast("Amount tendered must cover the amount still to pay.", "error");
+                        return;
+                    }
+                    amountTendered = due > 0 ? given : null;
+                }
+
+                const classes = { cash: "btn-success", gcash: "btn-primary", bdo: "btn-danger", bpi: "btn-warning text-dark", queenbank: "btn-info" };
+                const icons = {
+                    cash: '<i class="bi bi-cash-stack fs-1 text-success"></i>',
+                    gcash: '<i class="bi bi-phone fs-1 text-primary"></i>',
+                    bdo: '<i class="bi bi-bank fs-1 text-danger"></i>',
+                    queenbank: '<i class="bi bi-bank fs-1 text-info"></i>',
+                    bpi: '<i class="bi bi-bank2 fs-1 text-warning"></i>'
+                };
+
+                const confirmed = await showConfirmDialog({
+                    title: "Confirm Checkout",
+                    message: creditBalance > totalBill
+                        ? `Complete checkout using ${paymentLabel} credit and refund ₱${(creditBalance - totalBill).toFixed(2)} through ${paymentLabel}? Confirm only after returning the money.`
+                        : `Complete checkout for this customer using ${paymentLabel}${creditBalance > 0 ? ` credit; collect ₱${due.toFixed(2)} more` : ''}?`,
+                    confirmText: `Pay with ${paymentLabel}`,
+                    confirmClass: classes[paymentMethod] || "btn-success",
+                    iconType: paymentMethod,
+                    icon: icons[paymentMethod] || "💵"
+                });
+                if (!confirmed) return;
+
+                const checkoutData = new FormData();
+                checkoutData.append("payment_method", paymentMethod);
+                if (discountType) {
+                    checkoutData.append('discount_type', discountType);
+                    if (discountItemId) checkoutData.append('discount_item_id', discountItemId);
+                }
+                if (amountTendered !== null) {
+                    checkoutData.append("amount_tendered", amountTendered);
+                }
+
+                let checkoutUrl = `/api/checkout/${sessionId}?payment_method=${encodeURIComponent(paymentMethod)}`;
+                if (amountTendered !== null) {
+                    checkoutUrl += `&amount_tendered=${encodeURIComponent(amountTendered)}`;
+                }
+
+                const checkoutButton = document.getElementById("confirmCheckoutBtn");
+                try {
+                    const data = await runButtonAction(checkoutButton, {
+                        label: "Checking out...",
+                        slowLabel: "Still checking out..."
+                    }, requestKey => fetchJSON(checkoutUrl, {
+                        method: "POST",
+                        headers: { "Idempotency-Key": requestKey },
+                        body: checkoutData
+                    }));
+                    if (!data) return;
+                    if (data.error) {
+                        showToast(data.error, "error");
+                        return;
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('receiptModal')).hide();
+                    document.getElementById("payment-method-section").style.display = "none";
+                    let successMsg = `Customer checked out via ${data.payment_label || paymentLabel}.`;
+                    if (data.change_given !== undefined && data.change_given !== null && paymentMethod === "cash") {
+                        successMsg += ` Change: ₱${data.change_given.toFixed(2)}`;
+                    }
+                    showToast(successMsg, "success");
+                    loadSessions();
+                } catch (err) {
+                    if (err.data && err.data.duplicate) {
+                        showToast("This checkout is already being processed. The list will refresh.", "info");
+                        bootstrap.Modal.getInstance(document.getElementById('receiptModal')).hide();
+                        loadSessions();
+                    } else {
+                        showToast(err.message || "Failed to checkout customer. Please try again.", "error");
+                    }
+                }
+            };
+
+        })
+        .catch(err => {
+            showToast("Failed to load checkout preview. Please try again.", "error");
+        });
+
+    })
+    .catch(err => {
+        showToast("Failed to load order details. Please try again.", "error");
+    });
+}
+
+
+function escapeHtml(text) {
+    if (text === null || text === undefined) return "";
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+function buildSessionTableRow(session) {
+    if (foodOnlyView) {
+        return `
+            <tr>
+                <td>${escapeHtml(session.customer_name)}</td>
+                <td>${escapeHtml(session.space_type)}</td>
+                <td>₱${session.food_total.toFixed(2)}</td>
+                <td class="text-end">
+                    <button class="btn btn-primary btn-sm py-2 me-1" onclick="goToOrder(${session.session_id})">Add Order</button>
+                    <button class="btn btn-warning btn-sm py-2" onclick="viewOrder(${session.session_id})">View Order</button>
+                </td>
+            </tr>
+        `;
+    }
+    const purpose = session.space_type === "Boardroom" ? (session.purpose || "N/A") : "—";
+    const timedLounge = ["Regular Lounge", "Premium Lounge"].includes(session.space_type);
+    const pauseButton = timedLounge
+        ? `<button type="button" class="btn btn-outline-primary btn-sm py-2 ms-1" onclick="setSessionTimePaused(${session.session_id}, ${!session.paused}, this)" aria-label="${session.paused ? 'Resume' : 'Pause'} time bill for ${escapeHtml(session.customer_name)}">${session.paused ? 'Resume time' : 'Pause time'}</button>` : "";
+    const historyButton = session.has_time_pause
+        ? `<button type="button" class="btn btn-outline-secondary btn-sm py-2 ms-1" onclick="showTimeHistory(${session.session_id})" aria-label="Time bill history for ${escapeHtml(session.customer_name)}">Time history</button>` : "";
+    const cancelButton = timedLounge
+        ? `<button type="button" class="btn btn-outline-danger btn-sm py-2 ms-1" onclick="openCancelCheckin(${session.session_id})" title="Cancel mistaken Time In" aria-label="Cancel mistaken Time In for ${escapeHtml(session.customer_name)}"><i class="bi bi-trash3" aria-hidden="true"></i></button>` : "";
+    return `
+        <tr>
+            <td>${escapeHtml(session.customer_name)}</td>
+            <td class="d-none d-md-table-cell">${escapeHtml(session.school || "N/A")}</td>
+            <td class="d-none d-md-table-cell">${escapeHtml(session.course || "N/A")}</td>
+            <td class="d-none d-md-table-cell">${escapeHtml(purpose)}</td>
+            <td>${escapeHtml(session.space_type)}</td>
+            <td>${escapeHtml(session.time_in)}</td>
+            <td class="d-none d-md-table-cell">${formatTime(session.seconds_used)}${session.paused ? '<br><span class="badge text-bg-warning">Paused</span>' : ''}</td>
+            <td class="d-none d-md-table-cell">₱${session.current_bill.toFixed(2)}</td>
+            <td class="text-end">
+                <button class="btn btn-primary btn-sm py-2 me-1"
+                    onclick="goToOrder(${session.session_id})">
+                    Add Order
+                </button>
+                <button class="btn btn-warning btn-sm py-2"
+                    onclick="viewOrder(${session.session_id})">
+                    View Order
+                </button>
+                ${pauseButton}
+                ${historyButton}
+                ${cancelButton}
+            </td>
+        </tr>
+    `;
+}
+
+function buildSessionMobileCard(session) {
+    if (foodOnlyView) {
+        return `
+            <article class="mobile-session-card card shadow-sm mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                        <div class="mobile-session-name">${escapeHtml(session.customer_name)}</div>
+                        <span class="badge text-bg-secondary">${escapeHtml(session.space_type)}</span>
+                    </div>
+                    <div class="fw-semibold mb-3">Food Total: ₱${session.food_total.toFixed(2)}</div>
+                    <div class="mobile-session-actions">
+                        <button type="button" class="btn btn-primary" onclick="goToOrder(${session.session_id})">Add Order</button>
+                        <button type="button" class="btn btn-warning" onclick="viewOrder(${session.session_id})">View Order</button>
+                    </div>
+                </div>
+            </article>
+        `;
+    }
+    const schoolLine = [session.school, session.course].filter(Boolean).join(" · ");
+    const timedLounge = ["Regular Lounge", "Premium Lounge"].includes(session.space_type);
+    const pauseButton = timedLounge
+        ? `<button type="button" class="btn btn-outline-primary flex-fill" onclick="setSessionTimePaused(${session.session_id}, ${!session.paused}, this)" aria-label="${session.paused ? 'Resume' : 'Pause'} time bill for ${escapeHtml(session.customer_name)}">${session.paused ? 'Resume time' : 'Pause time'}</button>` : "";
+    const historyButton = session.has_time_pause
+        ? `<button type="button" class="btn btn-outline-secondary flex-fill" onclick="showTimeHistory(${session.session_id})" aria-label="Time bill history for ${escapeHtml(session.customer_name)}">Time history</button>` : "";
+    const purposeLine = session.space_type === "Boardroom" && session.purpose
+        ? `<div class="mobile-session-purpose text-muted small mb-2">Purpose: ${escapeHtml(session.purpose)}</div>`
+        : "";
+    const cancelButton = timedLounge
+        ? `<button type="button" class="btn btn-outline-danger" onclick="openCancelCheckin(${session.session_id})" aria-label="Cancel mistaken Time In for ${escapeHtml(session.customer_name)}"><i class="bi bi-trash3" aria-hidden="true"></i></button>` : "";
+    return `
+        <article class="mobile-session-card card shadow-sm mb-2">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div class="min-w-0">
+                        <div class="mobile-session-name">${escapeHtml(session.customer_name)}</div>
+                        ${schoolLine ? `<div class="text-muted small text-truncate">${escapeHtml(schoolLine)}</div>` : ""}
+                    </div>
+                    <span class="badge text-bg-secondary flex-shrink-0">${escapeHtml(session.space_type)}</span>
+                </div>
+                ${purposeLine}
+                <div class="mobile-session-meta row g-2 small mb-3">
+                    <div class="col-4">
+                        <span class="text-muted d-block">Time in</span>
+                        <span class="fw-semibold">${escapeHtml(session.time_in)}</span>
+                    </div>
+                    <div class="col-4">
+                        <span class="text-muted d-block">Billable time</span>
+                        <span class="fw-semibold">${formatTime(session.seconds_used)}</span>
+                        ${session.paused ? '<span class="badge text-bg-warning">Paused</span>' : ''}
+                    </div>
+                    <div class="col-4">
+                        <span class="text-muted d-block">Bill</span>
+                        <span class="fw-semibold">₱${session.current_bill.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div class="mobile-session-actions">
+                    <button type="button" class="btn btn-primary"
+                        onclick="goToOrder(${session.session_id})">
+                        Add Order
+                    </button>
+                    <button type="button" class="btn btn-warning"
+                        onclick="viewOrder(${session.session_id})">
+                        View Order
+                    </button>
+                </div>
+                ${timedLounge ? `<div class="d-flex flex-wrap gap-2 mt-2">${pauseButton}${historyButton}${cancelButton}</div>` : ''}
+            </div>
+        </article>
+    `;
+}
+
+// LOAD SESSIONS
+function loadSessions() {
+
+    fetch(foodOnlyView ? "/api/food-orders" : "/api/active-sessions", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+        if (!Array.isArray(data)) {
+            showToast("Failed to load sessions. Please refresh the page.", "error");
+            return;
+        }
+        sessionsById.clear();
+        data.forEach(customer => sessionsById.set(customer.session_id, customer));
+
+        const tableContainer = document.getElementById("sessions-container");
+        const cardsContainer = document.getElementById("sessions-cards");
+        const search = document.getElementById("searchInput").value.toLowerCase();
+
+        tableContainer.innerHTML = "";
+        if (cardsContainer) cardsContainer.innerHTML = "";
+
+        let visibleCount = 0;
+        let tableHtml = "";
+        let cardsHtml = "";
+
+        data.forEach(session => {
+
+            if (currentFilter !== "all" && session.space_type !== currentFilter) return;
+
+            if (!session.customer_name.toLowerCase().includes(search)) return;
+
+            visibleCount++;
+            tableHtml += buildSessionTableRow(session);
+            cardsHtml += buildSessionMobileCard(session);
+        });
+
+        document.getElementById("session-count").innerText = foodOnlyView
+            ? `${visibleCount} food order(s)` : `${visibleCount} customer(s)`;
+
+        if (visibleCount === 0) {
+            const emptyMsg = foodOnlyView ? "No active food orders." : "There is no customer at the moment.";
+            tableContainer.innerHTML = `<tr><td colspan="${foodOnlyView ? 4 : 9}" class="text-center text-muted py-4">${emptyMsg}</td></tr>`;
+            if (cardsContainer) {
+                cardsContainer.innerHTML = `<p class="text-center text-muted py-4 mb-0">${emptyMsg}</p>`;
+            }
+            return;
+        }
+
+        tableContainer.innerHTML = tableHtml;
+        if (cardsContainer) cardsContainer.innerHTML = cardsHtml;
+
+    })
+    .catch(() => {
+        const errMsg = "Failed to load sessions. Please refresh the page.";
+        document.getElementById("sessions-container").innerHTML =
+            `<tr><td colspan="${foodOnlyView ? 4 : 9}" class="text-center text-danger py-4">${errMsg}</td></tr>`;
+        const cardsContainer = document.getElementById("sessions-cards");
+        if (cardsContainer) {
+            cardsContainer.innerHTML = `<p class="text-center text-danger py-4 mb-0">${errMsg}</p>`;
+        }
+    });
+}
+
+// REALTIME UPDATES
+// Lightweight polling keeps dashboard data fresh if a socket connection drops.
+
+
+// INIT
+loadSessions();
+if (!foodOnlyView) loadSpaceAvailability();
+window.createSmartPoller(loadSessions, 10000, { runImmediately: false });
+if (!foodOnlyView) window.createSmartPoller(loadSpaceAvailability, 15000, { runImmediately: false });
+
+</script>
+
+{% endblock %}

@@ -1,0 +1,364 @@
+{% extends "layout.html" %}
+
+{% block title %}Expenses - Staff View - IdeaFlow{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-0">Expenses Log</h3>
+      <small id="expense-count" class="text-muted">{{ expenses|length }} record(s)</small>
+    </div>
+    <button class="btn btn-warning shadow-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
+      <i class="bi bi-plus-lg me-1"></i> Log Expense
+    </button>
+  </div>
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <label for="filterStartDate" class="small fw-semibold">Business dates</label>
+    <input type="date" id="filterStartDate" class="form-control form-control-sm w-auto" onchange="loadExpenses()">
+    <span>to</span>
+    <input type="date" id="filterEndDate" class="form-control form-control-sm w-auto" onchange="loadExpenses()">
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setExpenseDates('today')">Today</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setExpenseDates('all')">Show All</button>
+  </div>
+  <p class="text-muted small mb-2">Net spending by method. Owner/external-funded expenses do not reduce business funds. A later void appears on its reversal date.</p>
+  <div class="row g-3 mb-4" id="expense-method-cards" aria-live="polite"></div>
+
+  <!-- Desktop Table View -->
+  <div class="d-none d-md-block">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">All Expenses</h5>
+      </div>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Date</th>
+              <th>Method / Funding</th>
+              <th>Logged By</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="expenses-table-body">
+            <tr><td colspan="7" class="text-center text-muted py-4">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Card View -->
+  <div class="d-md-none" id="expenses-card-container">
+    <p class="text-center text-muted py-4">Loading...</p>
+  </div>
+</div>
+
+<!-- Add Expense Modal (Staff - Log Only) -->
+<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-labelledby="addExpenseModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addExpenseModalLabel">
+          <i class="bi bi-receipt me-2 text-warning"></i>Log Expense
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addExpenseForm" onsubmit="event.preventDefault(); createExpense();">
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="expenseCategory">Category <span class="text-danger">*</span></label>
+            <select id="expenseCategory" class="form-select" required>
+              <option value="">Select category...</option>
+              {% for cat in categories %}
+              <option value="{{ cat }}">{{ cat|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="expenseDescription">Description <span class="text-danger">*</span></label>
+            <textarea id="expenseDescription" class="form-control" rows="3" placeholder="Details about this expense..." required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="expenseAmount">Amount (₱) <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">₱</span>
+              <input type="number" id="expenseAmount" class="form-control" step="0.01" min="0.01" placeholder="0.00" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="expenseDate">Receipt / Expense Date <span class="text-danger">*</span></label>
+            <input type="date" id="expenseDate" class="form-control" required>
+            <small class="text-muted">Daily Balance uses the Manila date when you log this payment.</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="expensePaymentMethod">Paid using *</label>
+            <select id="expensePaymentMethod" class="form-select" required>
+              <option value="">Select method...</option>
+              <option value="cash">Cash</option><option value="gcash">GCash</option>
+              <option value="bdo">BDO</option><option value="bpi">BPI</option>
+              <option value="queenbank">QueenBank</option>
+            </select>
+          </div>
+          <div class="mb-3 d-none" id="expenseCashGroup"><label class="form-label" for="expenseCashBox">Cash paid from *</label><select id="expenseCashBox" class="form-select"><option value="">Choose source...</option><option value="petty">Petty cash box</option><option value="customer">Customer cash box</option><option value="owner">Owner paid directly</option></select></div>
+          <div class="mb-3 d-none" id="expenseRepayGroup"><label class="form-label" for="expenseRepayOwner">Must the business repay the owner? *</label><select id="expenseRepayOwner" class="form-select"><option value="">Choose Yes or No...</option><option value="yes">Yes, create owner payable</option><option value="no">No</option></select></div>
+          <div class="modal-footer px-0 pb-0 pt-3">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-warning fw-semibold" id="saveExpenseBtn">
+              <span class="spinner-border spinner-border-sm me-1 d-none" id="saveExpenseSpinner"></span>
+              Log Expense
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/expense-summary.js') }}"></script>
+<style>
+  .today-expense td:nth-child(1),
+  .today-expense td:nth-child(2),
+  .today-expense td:nth-child(3),
+  .today-expense td:nth-child(4) {
+    background-color: var(--warning-soft) !important;
+    font-weight: 600;
+  }
+</style>
+
+<script>
+function updateExpenseCashChoices() {
+  const cash = document.getElementById('expensePaymentMethod').value === 'cash';
+  document.getElementById('expenseCashGroup').classList.toggle('d-none', !cash);
+  document.getElementById('expenseRepayGroup').classList.toggle('d-none', !cash || document.getElementById('expenseCashBox').value !== 'owner');
+}
+document.getElementById('expensePaymentMethod').addEventListener('change', updateExpenseCashChoices);
+document.getElementById('expenseCashBox').addEventListener('change', updateExpenseCashChoices);
+function manilaExpenseDate() {
+  return new Intl.DateTimeFormat('sv-SE', {timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date());
+}
+const refreshExpenses = window.createDebouncedRefresh(loadExpenses, 150);
+let expensesCache = [];
+let reportsCache = null;
+let expenseLoadId = 0;
+
+document.addEventListener('DOMContentLoaded', function() {
+  setExpenseDates('today');
+
+  const modalEl = document.getElementById('addExpenseModal');
+  if (modalEl) {
+    modalEl.addEventListener('show.bs.modal', function() {
+      const today = manilaExpenseDate();
+      const dateInput = document.getElementById('expenseDate');
+      if (dateInput && !dateInput.value) {
+        dateInput.value = today;
+      }
+    });
+  }
+
+  // Socket.IO for real-time live synchronization
+  if (typeof window.getIdeaFlowSocket === 'function') {
+    try {
+      const socket = window.getIdeaFlowSocket();
+      if (!socket) return;
+      socket.on('expenses_update', function(data) {
+        refreshExpenses();
+      });
+      socket.on('daily_balance_update', refreshExpenses);
+      socket.on('connect', refreshExpenses);
+    } catch (e) {
+      console.warn('Socket connection note:', e);
+    }
+  }
+});
+
+function loadExpenses() {
+  const requestId = ++expenseLoadId;
+  const params = new URLSearchParams();
+  const start = document.getElementById('filterStartDate').value;
+  const end = document.getElementById('filterEndDate').value;
+  if (start) params.set('start_date', start);
+  if (end) params.set('end_date', end);
+  Promise.allSettled([
+    fetchJSON('/expenses-view/api/expenses'),
+    fetchJSON(`${window.managementBase}/daily-balance/api/reports?${params}`)
+  ]).then(([expensesResult, reportsResult]) => {
+    if (requestId !== expenseLoadId) return;
+    if (expensesResult.status === 'rejected') throw expensesResult.reason;
+    if (!expensesResult.value.success) throw new Error('Could not load expenses');
+    expensesCache = expensesResult.value.data;
+    reportsCache = reportsResult.status === 'fulfilled' && reportsResult.value.success ? reportsResult.value.data : null;
+    renderExpenses();
+    if (reportsCache === null) showToast('Expense totals could not be loaded.', 'error');
+  }).catch(error => {
+    if (requestId !== expenseLoadId) return;
+    const message = error.status === 403 ? 'Expenses access denied.' : 'Expense history could not be loaded. Please refresh the page.';
+    expensesCache = [];
+    document.getElementById('expenses-table-body').innerHTML = `<tr><td colspan="7" class="text-danger text-center">${message}</td></tr>`;
+    document.getElementById('expenses-card-container').textContent = message;
+    showToast(message, 'error');
+  });
+}
+
+function setExpenseDates(preset) {
+  const day = preset === 'today' ? manilaExpenseDate() : '';
+  document.getElementById('filterStartDate').value = day;
+  document.getElementById('filterEndDate').value = day;
+  loadExpenses();
+}
+
+function renderExpenses() {
+  const start = document.getElementById('filterStartDate').value;
+  const end = document.getElementById('filterEndDate').value;
+  const inRange = day => day && (!start || day >= start) && (!end || day <= end);
+  const filtered = expensesCache.filter(exp => inRange(exp.business_date) || inRange(exp.void_business_date));
+  const today = manilaExpenseDate();
+  document.getElementById('expense-count').textContent = `${filtered.length} record(s)`;
+  if (reportsCache === null) {
+    document.getElementById('expense-method-cards').textContent = 'Expense totals unavailable.';
+  } else {
+    window.renderExpenseCards(reportsCache, start, end, document.getElementById('expense-method-cards'));
+  }
+  const tbody = document.getElementById('expenses-table-body');
+  const cards = document.getElementById('expenses-card-container');
+  tbody.innerHTML = filtered.map(exp => {
+    const funding = exp.cash_box ? `${exp.cash_box === 'petty' ? 'Petty' : 'Customer'} cash box` : exp.payment_method === 'cash' && exp.funding_source === 'external' ? `Owner paid directly${exp.repay_owner ? ' · repay owner' : ''}` : exp.payment_method === 'cash' ? 'Box unknown (older entry)' : exp.funding_source === 'external' ? 'Owner/external funded' : exp.funding_source === 'legacy' ? 'Legacy / funding unknown' : 'Business';
+    const balance = `${exp.balance_before == null ? '' : `<div class="small text-muted">Business balance ₱${exp.balance_before.toFixed(2)} → ₱${exp.balance_after.toFixed(2)}</div>`}${exp.box_balance_before == null ? '' : `<div class="small text-muted">Box balance ₱${exp.box_balance_before.toFixed(2)} → ₱${exp.box_balance_after.toFixed(2)}</div>`}`;
+    const voidBalance = `${exp.void_balance_before == null ? '' : `<div class="small text-muted">Balance on void ₱${exp.void_balance_before.toFixed(2)} → ₱${exp.void_balance_after.toFixed(2)}</div>`}${exp.void_box_balance_before == null ? '' : `<div class="small text-muted">Box on void ₱${exp.void_box_balance_before.toFixed(2)} → ₱${exp.void_box_balance_after.toFixed(2)}</div>`}`;
+    return `<tr class="${exp.business_date === today ? 'today-expense' : ''}">
+      <td>${escapeHTML(exp.category)}</td><td>${escapeHTML(exp.description)}</td>
+      <td class="fw-semibold">₱${exp.amount.toFixed(2)}</td>
+      <td>${exp.business_date}${exp.expense_date !== exp.business_date ? `<div class="small text-muted">Receipt: ${exp.expense_date}</div>` : ''}</td>
+      <td>${escapeHTML(exp.payment_method.toUpperCase())}<div class="small">${funding}</div>${balance}</td>
+      <td>${escapeHTML(exp.logged_by)}</td>
+      <td>${exp.voided_at ? `Voided ${exp.void_business_date} by ${escapeHTML(exp.voided_by || '')}: ${escapeHTML(exp.void_reason || '')}${voidBalance}` : 'Active'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="text-center text-muted py-4">No expenses for this range.</td></tr>';
+  cards.innerHTML = filtered.map(exp => {
+    const funding = exp.cash_box ? `${exp.cash_box === 'petty' ? 'Petty' : 'Customer'} cash box` : exp.payment_method === 'cash' && exp.funding_source === 'external' ? `Owner paid directly${exp.repay_owner ? ' · repay owner' : ''}` : exp.payment_method === 'cash' ? 'Box unknown (older entry)' : exp.funding_source === 'external' ? 'Owner/external funded' : exp.funding_source === 'legacy' ? 'Legacy / funding unknown' : 'Business';
+    const balance = `${exp.balance_before == null ? '' : `<div class="small text-muted">Business balance ₱${exp.balance_before.toFixed(2)} → ₱${exp.balance_after.toFixed(2)}</div>`}${exp.box_balance_before == null ? '' : `<div class="small text-muted">Box balance ₱${exp.box_balance_before.toFixed(2)} → ₱${exp.box_balance_after.toFixed(2)}</div>`}`;
+    const voidBalance = `${exp.void_balance_before == null ? '' : `<div class="small text-muted">Balance on void ₱${exp.void_balance_before.toFixed(2)} → ₱${exp.void_balance_after.toFixed(2)}</div>`}${exp.void_box_balance_before == null ? '' : `<div class="small text-muted">Box on void ₱${exp.void_box_balance_before.toFixed(2)} → ₱${exp.void_box_balance_after.toFixed(2)}</div>`}`;
+    return `<div class="record-card mb-2">
+      <div class="record-card-header"><div><div class="record-card-title">${escapeHTML(exp.category)}</div><div class="record-card-subtitle">${escapeHTML(exp.description)}</div></div></div>
+      <div class="record-card-body small">${exp.business_date} · ${escapeHTML(exp.payment_method.toUpperCase())} · ${funding}<br>
+        Logged by ${escapeHTML(exp.logged_by)}${balance}${exp.voided_at ? `<br>Voided ${exp.void_business_date} by ${escapeHTML(exp.voided_by || '')}: ${escapeHTML(exp.void_reason || '')}${voidBalance}` : ''}</div>
+      <div class="record-card-footer"><span class="record-card-total">₱${exp.amount.toFixed(2)}</span></div>
+    </div>`;
+  }).join('') || '<p class="text-center text-muted py-4">No expenses for this range.</p>';
+}
+
+async function createExpense() {
+  const category = document.getElementById('expenseCategory').value.trim();
+  const description = document.getElementById('expenseDescription').value.trim();
+  const amountVal = document.getElementById('expenseAmount').value;
+  const expenseDate = document.getElementById('expenseDate').value;
+  const paymentMethod = document.getElementById('expensePaymentMethod').value;
+  const cashBox = paymentMethod === 'cash' ? document.getElementById('expenseCashBox').value : null;
+  const repayChoice = document.getElementById('expenseRepayOwner').value;
+  const saveBtn = document.getElementById('saveExpenseBtn');
+
+  if (!category || !description || !amountVal || !expenseDate || !paymentMethod) {
+    if (typeof showToast === 'function') {
+      showToast('Please fill in all required fields.', 'warning');
+    } else {
+      alert('Please fill in all required fields.');
+    }
+    return;
+  }
+
+  const amount = parseFloat(amountVal);
+  if (isNaN(amount) || amount <= 0) {
+    if (typeof showToast === 'function') {
+      showToast('Please enter a valid amount greater than 0.', 'warning');
+    } else {
+      alert('Please enter a valid amount greater than 0.');
+    }
+    return;
+  }
+  if (paymentMethod === 'cash' && (!cashBox || (cashBox === 'owner' && !repayChoice))) {
+    showToast('Choose the cash source and whether the owner must be repaid.', 'warning'); return;
+  }
+
+  try {
+    const body = await runButtonAction(saveBtn, {
+      label: 'Logging expense...',
+      slowLabel: 'Still logging...'
+    }, requestKey => fetchJSON('/expenses-view/api/expenses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': requestKey
+      },
+      body: JSON.stringify({
+        category: category,
+        description: description,
+        amount: amount,
+        expense_date: expenseDate,
+        payment_method: paymentMethod,
+        cash_box: cashBox,
+        repay_owner: cashBox === 'owner' ? repayChoice === 'yes' : null
+      })
+    }));
+    if (!body) return;
+
+    if (body.success !== false) {
+      if (typeof showToast === 'function') {
+        showToast(body.data?.funding_source === 'external'
+          ? 'Expense logged as externally funded; business balance unchanged.'
+          : 'Expense logged successfully!', 'success');
+      }
+
+      // Close modal
+      const modalEl = document.getElementById('addExpenseModal');
+      const modalInstance = bootstrap.Modal.getInstance(modalEl);
+      if (modalInstance) {
+        modalInstance.hide();
+      }
+
+      // Reset form
+      document.getElementById('addExpenseForm').reset();
+      const today = manilaExpenseDate();
+      document.getElementById('expenseDate').value = today;
+
+      // Reload expenses list
+      refreshExpenses();
+    } else {
+      const errMsg = body.error || 'Failed to log expense.';
+      if (typeof showToast === 'function') {
+        showToast(errMsg, 'error');
+      } else {
+        alert(errMsg);
+      }
+    }
+  } catch (err) {
+    console.error('Error logging expense:', err);
+    if (err.data && err.data.duplicate) {
+      showToast('This expense is already being processed. The list will refresh.', 'info');
+      refreshExpenses();
+    } else if (typeof showToast === 'function') {
+      showToast(err.message || 'Network error while logging expense.', 'error');
+    } else {
+      alert('Network error while logging expense.');
+    }
+  }
+}
+
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+</script>
+{% endblock %}
